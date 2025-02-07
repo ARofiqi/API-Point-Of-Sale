@@ -3,6 +3,7 @@ package handler
 import (
 	"aro-shop/db"
 	"aro-shop/models"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -10,27 +11,36 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+type ErrorDetail struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
 func generateErrorID() *string {
 	errorID := "ERR-" + time.Now().Format("150405")
 	return &errorID
 }
 
-func handleError(c echo.Context, statusCode int, message string, err error) error {
-	errorID := time.Now().UnixNano()
-	log.Printf("[ERROR %d] %s: %v", errorID, message, err)
+func Response(c echo.Context, statusCode int, message string, data interface{}, err error, errorDetails map[string]string) error {
+	errorID := generateErrorID()
+
+	if err != nil {
+		log.Printf("[ERROR %d] %s: %v", errorID, message, err)
+	}
 
 	return c.JSON(statusCode, models.Response{
-		Data:    nil,
+		Data:    data,
 		Message: message,
-		Errors:  []map[string]string{{"error_code": "ERR-" + time.Now().Format("150405")}},
-		ErrorID: generateErrorID(),
+		Errors:  []map[string]string{errorDetails},
+		ErrorID: errorID,
 	})
 }
 
 func GetTransactions(c echo.Context) error {
 	rows, err := db.DB.Query("SELECT id, date, total FROM transactions")
 	if err != nil {
-		return handleError(c, http.StatusInternalServerError, "Failed to fetch transactions", err)
+		errorDetails := map[string]string{"query_error": "Gagal mengambil transaksi"}
+		return Response(c, http.StatusInternalServerError, "Failed to fetch transactions", nil, err, errorDetails)
 	}
 	defer rows.Close()
 
@@ -40,58 +50,55 @@ func GetTransactions(c echo.Context) error {
 		var dateBytes []byte
 
 		if err := rows.Scan(&t.ID, &dateBytes, &t.Total); err != nil {
-			return handleError(c, http.StatusInternalServerError, "Error scanning transactions", err)
+			errorDetails := map[string]string{"scan_error": "Gagal membaca data transaksi"}
+			return Response(c, http.StatusInternalServerError, "Error scanning transactions", nil, err, errorDetails)
 		}
 
 		t.Date = string(dateBytes)
 
 		items, err := getTransactionItems(t.ID)
 		if err != nil {
-			return handleError(c, http.StatusInternalServerError, "Error fetching transaction items", err)
+			errorDetails := map[string]string{"fetch_items_error": "Gagal mengambil item transaksi"}
+			return Response(c, http.StatusInternalServerError, "Error fetching transaction items", nil, err, errorDetails)
 		}
 		t.Items = items
 
 		transactions = append(transactions, t)
 	}
 
-	return c.JSON(http.StatusOK, models.Response{
-		Data:    transactions,
-		Message: "Transactions retrieved successfully",
-		Errors:  nil,
-		ErrorID: nil,
-	})
+	return Response(c, http.StatusOK, "Transactions retrieved successfully", transactions, nil, nil)
 }
 
 func CreateTransaction(c echo.Context) error {
 	var t models.Transaction
 	if err := c.Bind(&t); err != nil {
-		return handleError(c, http.StatusBadRequest, "Invalid request format", err)
+		errorDetails := map[string]string{"binding_error": "Format permintaan tidak valid"}
+		return Response(c, http.StatusBadRequest, "Invalid request format", nil, err, errorDetails)
 	}
 
 	if err := validate.Struct(t); err != nil {
-		return handleError(c, http.StatusBadRequest, "Validation failed", err)
+		errorDetails := map[string]string{"validation_error": "Validasi gagal"}
+		return Response(c, http.StatusBadRequest, "Validation failed", nil, err, errorDetails)
 	}
 
 	if len(t.Items) == 0 {
-		return c.JSON(http.StatusBadRequest, models.Response{
-			Data:    nil,
-			Message: "Transaction must contain at least one item",
-			Errors:  []map[string]string{{"items": "At least one item is required"}},
-			ErrorID: nil,
-		})
+		errorDetails := map[string]string{"items": "At least one item is required"}
+		return Response(c, http.StatusBadRequest, "Transaction must contain at least one item", nil, nil, errorDetails)
 	}
 
 	t.Date = time.Now().Format("2006-01-02 15:04:05")
 
 	tx, err := db.DB.Begin()
 	if err != nil {
-		return handleError(c, http.StatusInternalServerError, "Failed to start transaction", err)
+		errorDetails := map[string]string{"transaction_error": "Gagal memulai transaksi"}
+		return Response(c, http.StatusInternalServerError, "Failed to start transaction", nil, err, errorDetails)
 	}
 
 	result, err := tx.Exec("INSERT INTO transactions (date, total) VALUES (?, ?)", t.Date, 0)
 	if err != nil {
 		tx.Rollback()
-		return handleError(c, http.StatusInternalServerError, "Failed to create transaction", err)
+		errorDetails := map[string]string{"insert_transaction_error": "Gagal membuat transaksi"}
+		return Response(c, http.StatusInternalServerError, "Failed to create transaction", nil, err, errorDetails)
 	}
 	transactionID, _ := result.LastInsertId()
 
@@ -101,7 +108,8 @@ func CreateTransaction(c echo.Context) error {
 		err := tx.QueryRow("SELECT price FROM products WHERE id = ?", item.ProductID).Scan(&price)
 		if err != nil {
 			tx.Rollback()
-			return handleError(c, http.StatusNotFound, "Product not found", err)
+			errorDetails := map[string]string{"product_not_found": fmt.Sprintf("Produk dengan ID %d tidak ditemukan", item.ProductID)}
+			return Response(c, http.StatusNotFound, "Product not found", nil, err, errorDetails)
 		}
 		subTotal := float64(item.Quantity) * price
 		total += subTotal
@@ -109,7 +117,8 @@ func CreateTransaction(c echo.Context) error {
 		result, err := tx.Exec("INSERT INTO transaction_items (transaction_id, product_id, quantity, sub_total) VALUES (?, ?, ?, ?)", transactionID, item.ProductID, item.Quantity, subTotal)
 		if err != nil {
 			tx.Rollback()
-			return handleError(c, http.StatusInternalServerError, "Failed to create transaction items", err)
+			errorDetails := map[string]string{"insert_item_error": "Gagal menambahkan item transaksi"}
+			return Response(c, http.StatusInternalServerError, "Failed to create transaction items", nil, err, errorDetails)
 		}
 
 		itemID, _ := result.LastInsertId()
@@ -121,18 +130,15 @@ func CreateTransaction(c echo.Context) error {
 	_, err = tx.Exec("UPDATE transactions SET total = ? WHERE id = ?", total, transactionID)
 	if err != nil {
 		tx.Rollback()
-		return handleError(c, http.StatusInternalServerError, "Failed to update transaction total", err)
+		errorDetails := map[string]string{"update_total_error": "Gagal memperbarui total transaksi"}
+		return Response(c, http.StatusInternalServerError, "Failed to update transaction total", nil, err, errorDetails)
 	}
 
 	tx.Commit()
 	t.ID = int(transactionID)
 	t.Total = total
-	return c.JSON(http.StatusCreated, models.Response{
-		Data:    t,
-		Message: "Transaction created successfully",
-		Errors:  nil,
-		ErrorID: nil,
-	})
+
+	return Response(c, http.StatusCreated, "Transaction created successfully", t, nil, nil)
 }
 
 func getTransactionItems(transactionID int) ([]models.TransactionItem, error) {

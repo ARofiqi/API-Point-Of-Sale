@@ -34,12 +34,7 @@ func GetProducts(c echo.Context) error {
 
 	rows, err := db.DB.Query(query, args...)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.Response{
-			Data:    nil,
-			Message: "Failed to fetch products",
-			Errors:  []map[string]string{{"error": err.Error()}},
-			ErrorID: generateErrorID(),
-		})
+		return Response(c, http.StatusInternalServerError, "Failed to fetch products", nil, err, nil)
 	}
 	defer rows.Close()
 
@@ -47,88 +42,46 @@ func GetProducts(c echo.Context) error {
 	for rows.Next() {
 		var p models.Product
 		if err := rows.Scan(&p.ID, &p.Name, &p.Price, &p.Category); err != nil {
-			return c.JSON(http.StatusInternalServerError, models.Response{
-				Data:    nil,
-				Message: "Failed to parse products",
-				Errors:  []map[string]string{{"error": err.Error()}},
-				ErrorID: generateErrorID(),
-			})
+			return Response(c, http.StatusInternalServerError, "Failed to parse products", nil, err, nil)
 		}
 		products = append(products, p)
 	}
-	return c.JSON(http.StatusOK, models.Response{
-		Data:    products,
-		Message: "Products fetched successfully",
-		Errors:  nil,
-	})
+	return Response(c, http.StatusOK, "Products fetched successfully", products, nil, nil)
 }
 
 func CreateProduct(c echo.Context) error {
 	var p models.Product
 	if err := c.Bind(&p); err != nil {
-		return c.JSON(http.StatusBadRequest, models.Response{
-			Data:    nil,
-			Message: "Invalid request",
-			Errors:  []map[string]string{{"error": err.Error()}},
-			ErrorID: generateErrorID(),
-		})
+		return Response(c, http.StatusBadRequest, "Invalid request format", nil, err, nil)
 	}
 
 	if err := validate.Struct(p); err != nil {
-		return c.JSON(http.StatusBadRequest, models.Response{
-			Data:    nil,
-			Message: "Validation failed",
-			Errors:  []map[string]string{{"error": err.Error()}},
-			ErrorID: generateErrorID(),
-		})
+		return Response(c, http.StatusBadRequest, "Validation failed", nil, err, nil)
 	}
 
 	result, err := db.DB.Exec("INSERT INTO products (name, price, category) VALUES (?, ?, ?)", p.Name, p.Price, p.Category)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.Response{
-			Data:    nil,
-			Message: "Failed to create product",
-			Errors:  []map[string]string{{"error": err.Error()}},
-			ErrorID: generateErrorID(),
-		})
+		return Response(c, http.StatusInternalServerError, "Failed to create product", nil, err, nil)
 	}
 
 	id, _ := result.LastInsertId()
 	p.ID = int(id)
-	return c.JSON(http.StatusCreated, models.Response{
-		Data:    p,
-		Message: "Product created successfully",
-		Errors:  nil,
-	})
+	return Response(c, http.StatusCreated, "Product created successfully", p, nil, nil)
 }
 
 func UpdateProduct(c echo.Context) error {
 	id := c.Param("id")
 	var p models.Product
 	if err := c.Bind(&p); err != nil {
-		return c.JSON(http.StatusBadRequest, models.Response{
-			Data:    nil,
-			Message: "Invalid request",
-			Errors:  []map[string]string{{"error": err.Error()}},
-			ErrorID: generateErrorID(),
-		})
+		return Response(c, http.StatusBadRequest, "Invalid request format", nil, err, nil)
 	}
 
 	_, err := db.DB.Exec("UPDATE products SET name = ?, price = ?, category = ? WHERE id = ?", p.Name, p.Price, p.Category, id)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.Response{
-			Data:    nil,
-			Message: "Failed to update product",
-			Errors:  []map[string]string{{"error": err.Error()}},
-			ErrorID: generateErrorID(),
-		})
+		return Response(c, http.StatusInternalServerError, "Failed to update product", nil, err, nil)
 	}
 
-	return c.JSON(http.StatusOK, models.Response{
-		Data:    p,
-		Message: "Product updated successfully",
-		Errors:  nil,
-	})
+	return Response(c, http.StatusOK, "Product updated successfully", p, nil, nil)
 }
 
 func DeleteProduct(c echo.Context) error {
@@ -136,17 +89,8 @@ func DeleteProduct(c echo.Context) error {
 
 	_, err := db.DB.Exec("DELETE FROM products WHERE id = ?", id)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.Response{
-			Data:    nil,
-			Message: "Failed to delete product",
-			Errors:  []map[string]string{{"error": err.Error()}},
-			ErrorID: generateErrorID(),
-		})
+		return Response(c, http.StatusInternalServerError, "Failed to delete product", nil, err, nil)
 	}
 
-	return c.JSON(http.StatusOK, models.Response{
-		Data:    nil,
-		Message: "Product deleted successfully",
-		Errors:  nil,
-	})
+	return Response(c, http.StatusOK, "Product deleted successfully", nil, nil, nil)
 }
