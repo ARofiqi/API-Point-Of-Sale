@@ -8,8 +8,8 @@
 
 2. Bikin relasional API // DONE
 Get Product with Category // DONE
-    Search Product by name
-    filter product by Category
+    Search Product by name // DONE
+    filter product by Category // DONE
 
 Get Category with Product // DONE
 
