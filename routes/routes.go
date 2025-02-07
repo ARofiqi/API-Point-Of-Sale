@@ -16,6 +16,6 @@ func SetupRoutes(e *echo.Echo) {
 
 	e.GET("/transactions", handler.GetTransactions)
 	e.POST("/transactions", handler.CreateTransaction)
-	e.PUT("/transactions/:id", handler.UpdateTransaction)
-	e.DELETE("/transactions/:id", handler.DeleteTransaction)
+	// e.PUT("/transactions/:id", handler.UpdateTransaction)
+	// e.DELETE("/transactions/:id", handler.DeleteTransaction)
 }
