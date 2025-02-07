@@ -5,6 +5,7 @@ import (
 	"aro-shop/models"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -13,7 +14,27 @@ import (
 var validate = validator.New()
 
 func GetProducts(c echo.Context) error {
-	rows, err := db.DB.Query("SELECT id, name, price, category FROM products")
+	category := c.QueryParam("category")
+	search := c.QueryParam("search")
+
+	query := "SELECT id, name, price, category FROM products"
+	var args []interface{}
+
+	if category != "" {
+		query += " WHERE category = ?"
+		args = append(args, category)
+	}
+
+	if search != "" {
+		if category != "" {
+			query += " AND name LIKE ?"
+		} else {
+			query += " WHERE name LIKE ?"
+		}
+		args = append(args, "%"+search+"%")
+	}
+
+	rows, err := db.DB.Query(query, args...)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.Response{
 			Data:    nil,
@@ -40,6 +61,51 @@ func GetProducts(c echo.Context) error {
 	return c.JSON(http.StatusOK, models.Response{
 		Data:    products,
 		Message: "Products fetched successfully",
+		Errors:  nil,
+	})
+}
+
+func GetCategoriesWithProducts(c echo.Context) error {
+	query := `SELECT category, name FROM products ORDER BY category`
+
+	rows, err := db.DB.Query(query)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.Response{
+			Data:    nil,
+			Message: "Failed to fetch categories with products",
+			Errors:  []string{err.Error()},
+			ErrorID: "500-006",
+		})
+	}
+	defer rows.Close()
+
+	categoryMap := make(map[string][]string)
+	for rows.Next() {
+		var category string
+		var product string
+		if err := rows.Scan(&category, &product); err != nil {
+			return c.JSON(http.StatusInternalServerError, models.Response{
+				Data:    nil,
+				Message: "Failed to parse categories",
+				Errors:  []string{err.Error()},
+				ErrorID: "500-007",
+			})
+		}
+		normalizedCategory := strings.ToLower(category)
+		categoryMap[normalizedCategory] = append(categoryMap[normalizedCategory], product)
+	}
+
+	var categories []map[string]interface{}
+	for category, products := range categoryMap {
+		categories = append(categories, map[string]interface{}{
+			"category": category,
+			"products": products,
+		})
+	}
+
+	return c.JSON(http.StatusOK, models.Response{
+		Data:    categories,
+		Message: "Categories with products fetched successfully",
 		Errors:  nil,
 	})
 }

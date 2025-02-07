@@ -6,12 +6,12 @@
     errorID
 }
 
-2. Bikin relasional API 
-Get Product with Category
+2. Bikin relasional API // DONE
+Get Product with Category // DONE
     Search Product by name
     filter product by Category
-    
-Get Category with Product
+
+Get Category with Product 
 
 transaction
 get transaction by date range
