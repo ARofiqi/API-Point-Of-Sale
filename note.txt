@@ -11,7 +11,7 @@ Get Product with Category // DONE
     Search Product by name
     filter product by Category
 
-Get Category with Product 
+Get Category with Product // DONE
 
 transaction
 get transaction by date range
