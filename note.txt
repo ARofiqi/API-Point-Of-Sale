@@ -13,9 +13,9 @@ Get Product with Category // DONE
 
 Get Category with Product // DONE
 
-transaction
-get transaction by date range
-get transaction sub total
+transaction // DONE
+get transaction by date range // DONE
+get transaction sub total // DONE
 
 Buat logging
 time, path, method, error massage, request body, UUID
