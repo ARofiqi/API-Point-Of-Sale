@@ -1,0 +1,36 @@
+1. response // DONE
+{
+    data:[]/{}
+    massage:""
+    errors:[]
+    errorID
+}
+
+2. Bikin relasional API 
+Get Product with Category
+    Search Product by name
+    filter product by Category
+    
+Get Category with Product
+
+transaction
+get transaction by date range
+get transaction sub total
+
+Buat logging
+time, path, method, error massage, request body, UUID
+
+Buat autentikasi
+JWT, autorisasi, middleware(buat rate limiter)
+
+Buat benchmark (K6)
+
+Hosting
+(Reverse Proxy) 
+
+Linux(Permission and Ownership)
+manipulasi file dan folder
+
+buat script automasi
+
+Jetsh
