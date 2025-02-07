@@ -5,22 +5,25 @@ import (
 	"aro-shop/models"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
 )
 
+func generateErrorID() *string {
+	errorID := "ERR-" + time.Now().Format("150405")
+	return &errorID
+}
+
 func handleError(c echo.Context, statusCode int, message string, err error) error {
 	errorID := time.Now().UnixNano()
-	errorIDStr := strconv.FormatInt(errorID, 10)
 	log.Printf("[ERROR %d] %s: %v", errorID, message, err)
 
 	return c.JSON(statusCode, models.Response{
 		Data:    nil,
 		Message: message,
 		Errors:  []map[string]string{{"error_code": "ERR-" + time.Now().Format("150405")}},
-		ErrorID: &errorIDStr,
+		ErrorID: generateErrorID(),
 	})
 }
 
