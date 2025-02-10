@@ -12,9 +12,10 @@ import (
 )
 
 func GetTransactions(c echo.Context) error {
+	errorDetails := make(map[string]string)
 	rows, err := db.DB.Query("SELECT id, date, total FROM transactions")
 	if err != nil {
-		errorDetails := map[string]string{"query_error": "Gagal mengambil transaksi"}
+		errorDetails["query_error"] = "Gagal mengambil transaksi"
 		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch transactions", nil, err, errorDetails)
 	}
 	defer rows.Close()
@@ -25,7 +26,7 @@ func GetTransactions(c echo.Context) error {
 		var dateBytes []byte
 
 		if err := rows.Scan(&t.ID, &dateBytes, &t.Total); err != nil {
-			errorDetails := map[string]string{"scan_error": "Gagal membaca data transaksi"}
+			errorDetails["scan_error"] = "Gagal membaca data transaksi"
 			return utils.Response(c, http.StatusInternalServerError, "Error scanning transactions", nil, err, errorDetails)
 		}
 
@@ -33,7 +34,7 @@ func GetTransactions(c echo.Context) error {
 
 		items, err := getTransactionItems(t.ID)
 		if err != nil {
-			errorDetails := map[string]string{"fetch_items_error": "Gagal mengambil item transaksi"}
+			errorDetails["fetch_items_error"] = "Gagal mengambil item transaksi"
 			return utils.Response(c, http.StatusInternalServerError, "Error fetching transaction items", nil, err, errorDetails)
 		}
 		t.Items = items
@@ -45,19 +46,20 @@ func GetTransactions(c echo.Context) error {
 }
 
 func CreateTransaction(c echo.Context) error {
+	errorDetails := make(map[string]string)
 	var t models.Transaction
 	if err := c.Bind(&t); err != nil {
-		errorDetails := map[string]string{"binding_error": "Format permintaan tidak valid"}
+		errorDetails["binding_error"] = "Format permintaan tidak valid"
 		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, errorDetails)
 	}
 
 	if err := validate.Struct(t); err != nil {
-		errorDetails := map[string]string{"validation_error": "Validasi gagal"}
+		errorDetails["validation_error"] = "Validasi gagal"
 		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, err, errorDetails)
 	}
 
 	if len(t.Items) == 0 {
-		errorDetails := map[string]string{"items": "At least one item is required"}
+		errorDetails["items"] = "At least one item is required"
 		return utils.Response(c, http.StatusBadRequest, "Transaction must contain at least one item", nil, nil, errorDetails)
 	}
 
@@ -65,14 +67,14 @@ func CreateTransaction(c echo.Context) error {
 
 	tx, err := db.DB.Begin()
 	if err != nil {
-		errorDetails := map[string]string{"transaction_error": "Gagal memulai transaksi"}
+		errorDetails["transaction_error"] = "Gagal memulai transaksi"
 		return utils.Response(c, http.StatusInternalServerError, "Failed to start transaction", nil, err, errorDetails)
 	}
 
 	result, err := tx.Exec("INSERT INTO transactions (date, total) VALUES (?, ?)", t.Date, 0)
 	if err != nil {
 		tx.Rollback()
-		errorDetails := map[string]string{"insert_transaction_error": "Gagal membuat transaksi"}
+		errorDetails["insert_transaction_error"] = "Gagal membuat transaksi"
 		return utils.Response(c, http.StatusInternalServerError, "Failed to create transaction", nil, err, errorDetails)
 	}
 	transactionID, _ := result.LastInsertId()
@@ -83,7 +85,7 @@ func CreateTransaction(c echo.Context) error {
 		err := tx.QueryRow("SELECT price FROM products WHERE id = ?", item.ProductID).Scan(&price)
 		if err != nil {
 			tx.Rollback()
-			errorDetails := map[string]string{"product_not_found": fmt.Sprintf("Produk dengan ID %d tidak ditemukan", item.ProductID)}
+			errorDetails["product_not_found"] = fmt.Sprintf("Produk dengan ID %d tidak ditemukan", item.ProductID)
 			return utils.Response(c, http.StatusNotFound, "Product not found", nil, err, errorDetails)
 		}
 		subTotal := float64(item.Quantity) * price
@@ -92,7 +94,7 @@ func CreateTransaction(c echo.Context) error {
 		result, err := tx.Exec("INSERT INTO transaction_items (transaction_id, product_id, quantity, sub_total) VALUES (?, ?, ?, ?)", transactionID, item.ProductID, item.Quantity, subTotal)
 		if err != nil {
 			tx.Rollback()
-			errorDetails := map[string]string{"insert_item_error": "Gagal menambahkan item transaksi"}
+			errorDetails["insert_item_error"] = "Gagal menambahkan item transaksi"
 			return utils.Response(c, http.StatusInternalServerError, "Failed to create transaction items", nil, err, errorDetails)
 		}
 
@@ -105,7 +107,7 @@ func CreateTransaction(c echo.Context) error {
 	_, err = tx.Exec("UPDATE transactions SET total = ? WHERE id = ?", total, transactionID)
 	if err != nil {
 		tx.Rollback()
-		errorDetails := map[string]string{"update_total_error": "Gagal memperbarui total transaksi"}
+		errorDetails["update_total_error"] = "Gagal memperbarui total transaksi"
 		return utils.Response(c, http.StatusInternalServerError, "Failed to update transaction total", nil, err, errorDetails)
 	}
 
@@ -117,8 +119,10 @@ func CreateTransaction(c echo.Context) error {
 }
 
 func getTransactionItems(transactionID int) ([]models.TransactionItem, error) {
+	errorDetails := make(map[string]string)
 	rows, err := db.DB.Query("SELECT id, transaction_id, product_id, quantity, sub_total FROM transaction_items WHERE transaction_id = ?", transactionID)
 	if err != nil {
+		errorDetails["query_items_error"] = "Gagal mengambil item transaksi"
 		return nil, err
 	}
 	defer rows.Close()
@@ -127,6 +131,7 @@ func getTransactionItems(transactionID int) ([]models.TransactionItem, error) {
 	for rows.Next() {
 		var item models.TransactionItem
 		if err := rows.Scan(&item.ID, &item.TransactionID, &item.ProductID, &item.Quantity, &item.SubTotal); err != nil {
+			errorDetails["scan_items_error"] = "Gagal membaca data item transaksi"
 			return nil, err
 		}
 		items = append(items, item)
