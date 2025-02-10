@@ -8,11 +8,11 @@ import (
 
 func SetupRoutes(e *echo.Echo) {
 	e.GET("/products", handler.GetProducts)
-	// e.GET("/products/:id", handler.GetProductByID)
-	// e.GET("/categories", handler.GetCategoriesWithProducts)
+	e.GET("/products/:id", handler.GetProductByID)
+	e.GET("/categories", handler.GetCategoriesWithProducts)
 	e.POST("/products", handler.CreateProduct)
-	// e.PUT("/products/:id", handler.UpdateProduct)
-	// e.DELETE("/products/:id", handler.DeleteProduct)
+	e.PUT("/products/:id", handler.UpdateProduct)
+	e.DELETE("/products/:id", handler.DeleteProduct)
 
 	e.GET("/transactions", handler.GetTransactions)
 	e.POST("/transactions", handler.CreateTransaction)
