@@ -35,7 +35,7 @@ func GetProducts(c echo.Context) error {
 
 	rows, err := db.DB.Query(query, args...)
 	if err != nil {
-		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch products", nil, err, nil)
+		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch products", []models.Product{}, err, nil)
 	}
 	defer rows.Close()
 
@@ -43,7 +43,7 @@ func GetProducts(c echo.Context) error {
 	for rows.Next() {
 		var p models.Product
 		if err := rows.Scan(&p.ID, &p.Name, &p.Price, &p.Category); err != nil {
-			return utils.Response(c, http.StatusInternalServerError, "Failed to parse products", nil, err, nil)
+			return utils.Response(c, http.StatusInternalServerError, "Failed to parse products", []models.Product{}, err, nil)
 		}
 		products = append(products, p)
 	}
