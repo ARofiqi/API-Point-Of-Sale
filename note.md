@@ -16,7 +16,7 @@
 6. get transaction sub total // DONE
 
 ## Buat logging
-time, path, method, error massage, request body, UUID
+time, path, method, error massage, request body, UUID // DONE
 
 ## Buat autentikasi // DONE
 JWT, autorisasi, middleware(buat rate limiter)

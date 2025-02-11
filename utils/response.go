@@ -10,6 +10,7 @@ func Response(c echo.Context, statusCode int, message string, data interface{}, 
 	var errorID string
 	if errorDetails != nil && len(errorDetails) > 0 {
 		errorID = generateErrorID()
+		LogError(c, errorID, message, err)
 	}
 
 	return c.JSON(statusCode, models.Response{
