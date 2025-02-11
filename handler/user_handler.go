@@ -53,7 +53,7 @@ func Register(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Error hashing password", nil, err, nil)
 	}
 
-	result, err := db.DB.Exec("INSERT INTO users (name, email, password) VALUES (?, ?, ?)", req.Name, req.Email, string(hashedPassword))
+	result, err := db.DB.Exec("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)", req.Name, req.Email, string(hashedPassword), "user")
 	if err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to register user", nil, err, nil)
 	}
@@ -86,8 +86,8 @@ func Login(c echo.Context) error {
 	var user models.User
 	email := strings.TrimSpace(strings.ToLower(req.Email))
 
-	row := db.DB.QueryRow("SELECT id, name, email, password FROM users WHERE email = ?", email)
-	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Password)
+	row := db.DB.QueryRow("SELECT id, name, email, password, role FROM users WHERE email = ?", email)
+	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.Role)
 	if err != nil {
 		return utils.Response(c, http.StatusUnauthorized, "Invalid email or password", nil, err, nil)
 	}
@@ -98,6 +98,7 @@ func Login(c echo.Context) error {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.ID,
+		"role":    user.Role,
 		"exp":     time.Now().Add(time.Hour * 24).Unix(),
 	})
 
@@ -108,4 +109,27 @@ func Login(c echo.Context) error {
 
 	data := map[string]string{"token": tokenString}
 	return utils.Response(c, http.StatusOK, "Login successful", data, nil, nil)
+}
+
+func SetUserRole(c echo.Context) error {
+	userID := c.Param("id")
+	var req struct {
+		Role string `json:"role" validate:"required,oneof=user admin"`
+	}
+
+	if err := c.Bind(&req); err != nil {
+		return utils.Response(c, http.StatusBadRequest, "Invalid request", nil, err, nil)
+	}
+
+	if err := validate.Struct(req); err != nil {
+		errorDetails := parseValidationErrors(err)
+		return utils.Response(c, http.StatusBadRequest, "Validation error", nil, err, errorDetails)
+	}
+
+	_, err := db.DB.Exec("UPDATE users SET role = ? WHERE id = ?", req.Role, userID)
+	if err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Failed to update role", nil, err, nil)
+	}
+
+	return utils.Response(c, http.StatusOK, "User role updated successfully", nil, nil, nil)
 }

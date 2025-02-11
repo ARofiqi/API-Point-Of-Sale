@@ -1,9 +1,10 @@
 ## response // DONE
+
 {
-    data:[]/{}
-    massage:""
-    errors:[]
-    errorID
+data:[]/{}
+massage:""
+errors:[]
+errorID
 }
 
 ## Bikin relasional API // DONE
@@ -16,15 +17,18 @@
 6. get transaction sub total // DONE
 
 ## Buat logging
+
 time, path, method, error massage, request body, UUID // DONE
 
 ## Buat autentikasi // DONE
-JWT, autorisasi, middleware(buat rate limiter)
+
+JWT // DONE, autorisasi // DONE, middleware(buat rate limiter)
 
 ## Buat benchmark (K6)
 
 ## Hosting
-(Reverse Proxy) 
+
+(Reverse Proxy)
 
 Linux(Permission and Ownership)
 manipulasi file dan folder

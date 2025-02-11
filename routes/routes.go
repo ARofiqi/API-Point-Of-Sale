@@ -16,14 +16,17 @@ func SetupRoutes(e *echo.Echo) {
 
 	authGroup.GET("/products", handler.GetProducts)
 	authGroup.GET("/products/:id", handler.GetProductByID)
-	authGroup.POST("/products", handler.CreateProduct)
-	authGroup.PUT("/products/:id", handler.UpdateProduct)
-	authGroup.DELETE("/products/:id", handler.DeleteProduct)
-
 	authGroup.GET("/categories", handler.GetCategoriesWithProducts)
-
 	authGroup.GET("/transactions", handler.GetTransactions)
-	authGroup.POST("/transactions", handler.CreateTransaction)
 	authGroup.GET("/transactions/date", handler.GetTransactionsByDateRange)
 	authGroup.GET("/transactions/:id/subtotal", handler.GetTransactionSubtotal)
+
+	adminGroup := e.Group("")
+	adminGroup.Use(middleware.JWTMiddleware, middleware.RoleMiddleware("admin"))
+
+	adminGroup.POST("/products", handler.CreateProduct)
+	adminGroup.PUT("/products/:id", handler.UpdateProduct)
+	adminGroup.DELETE("/products/:id", handler.DeleteProduct)
+	adminGroup.POST("/transactions", handler.CreateTransaction)
+	adminGroup.PUT("/users/:id/role", handler.SetUserRole)
 }
