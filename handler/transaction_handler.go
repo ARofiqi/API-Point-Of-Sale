@@ -139,3 +139,70 @@ func getTransactionItems(transactionID int) ([]models.TransactionItem, error) {
 
 	return items, nil
 }
+
+func GetTransactionsByDateRange(c echo.Context) error {
+	errorDetails := make(map[string]string)
+
+	startDate := c.QueryParam("start_date")
+	endDate := c.QueryParam("end_date")
+
+	if startDate == "" || endDate == "" {
+		errorDetails["date_range_error"] = "Start date dan end date diperlukan"
+		return utils.Response(c, http.StatusBadRequest, "Start date and end date are required", nil, nil, errorDetails)
+	}
+
+	rows, err := db.DB.Query("SELECT id, date, total FROM transactions WHERE date BETWEEN ? AND ?", startDate, endDate)
+	if err != nil {
+		errorDetails["query_error"] = "Gagal mengambil transaksi berdasarkan rentang tanggal"
+		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch transactions by date range", nil, err, errorDetails)
+	}
+	defer rows.Close()
+
+	var transactions []models.Transaction
+	for rows.Next() {
+		var t models.Transaction
+		var dateBytes []byte
+
+		if err := rows.Scan(&t.ID, &dateBytes, &t.Total); err != nil {
+			errorDetails["scan_error"] = "Gagal membaca data transaksi"
+			return utils.Response(c, http.StatusInternalServerError, "Error scanning transactions", nil, err, errorDetails)
+		}
+
+		t.Date = string(dateBytes)
+
+		items, err := getTransactionItems(t.ID)
+		if err != nil {
+			errorDetails["fetch_items_error"] = "Gagal mengambil item transaksi"
+			return utils.Response(c, http.StatusInternalServerError, "Error fetching transaction items", nil, err, errorDetails)
+		}
+		t.Items = items
+
+		transactions = append(transactions, t)
+	}
+
+	return utils.Response(c, http.StatusOK, "Transactions retrieved successfully", transactions, nil, nil)
+}
+
+func GetTransactionSubtotal(c echo.Context) error {
+	errorDetails := make(map[string]string)
+
+	transactionID := c.Param("id")
+	if transactionID == "" {
+		errorDetails["transaction_id_error"] = "ID transaksi diperlukan"
+		return utils.Response(c, http.StatusBadRequest, "Transaction ID is required", nil, nil, errorDetails)
+	}
+
+	var subtotal float64
+	err := db.DB.QueryRow("SELECT SUM(sub_total) FROM transaction_items WHERE transaction_id = ?", transactionID).Scan(&subtotal)
+	if err != nil {
+		errorDetails["query_error"] = "Gagal mengambil subtotal transaksi"
+		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch transaction subtotal", nil, err, errorDetails)
+	}
+
+	result := map[string]interface{}{
+		"transaction_id": transactionID,
+		"subtotal":       subtotal,
+	}
+
+	return utils.Response(c, http.StatusOK, "Transaction subtotal retrieved successfully", result, nil, nil)
+}

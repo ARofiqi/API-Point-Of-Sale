@@ -24,4 +24,6 @@ func SetupRoutes(e *echo.Echo) {
 
 	authGroup.GET("/transactions", handler.GetTransactions)
 	authGroup.POST("/transactions", handler.CreateTransaction)
+	authGroup.GET("/transactions/date-range", handler.GetTransactionsByDateRange)
+	authGroup.GET("/transactions/:id/subtotal", handler.GetTransactionSubtotal)
 }
