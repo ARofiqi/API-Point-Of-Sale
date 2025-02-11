@@ -7,10 +7,10 @@
 }
 
 ## Bikin relasional API // DONE
+
 1. Get Product with Category // DONE
 2. Search Product by name // DONE
 3. filter product by Category // DONE
-
 4. Get Category with Product // DONE
 5. get transaction by date range // DONE
 6. get transaction sub total // DONE
