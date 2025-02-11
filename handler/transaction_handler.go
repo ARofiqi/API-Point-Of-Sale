@@ -143,8 +143,8 @@ func getTransactionItems(transactionID int) ([]models.TransactionItem, error) {
 func GetTransactionsByDateRange(c echo.Context) error {
 	errorDetails := make(map[string]string)
 
-	startDate := c.QueryParam("start_date")
-	endDate := c.QueryParam("end_date")
+	startDate := c.QueryParam("start")
+	endDate := c.QueryParam("end")
 
 	if startDate == "" || endDate == "" {
 		errorDetails["date_range_error"] = "Start date dan end date diperlukan"
