@@ -47,6 +47,7 @@ func JWTMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			return utils.Response(c, http.StatusUnauthorized, "Gagal membaca klaim token", nil, nil, errorDetails)
 		}
 
+		c.Set("user", token)
 		c.Set("user_id", claims["user_id"])
 
 		return next(c)

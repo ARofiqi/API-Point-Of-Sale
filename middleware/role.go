@@ -33,7 +33,7 @@ func RoleMiddleware(allowedRole string) echo.MiddlewareFunc {
 			}
 
 			if role != allowedRole {
-				return utils.Response(c, http.StatusForbidden, "Access denied. Insufficient permissions.", nil, nil, nil)
+				return utils.Response(c, http.StatusForbidden, "Kamu bukan "+allowedRole, nil, nil, nil)
 			}
 
 			return next(c)
