@@ -1,11 +1,13 @@
-## response // DONE
+# response // DONE
 
+```
 {
-data:[]/{}
-massage:""
-errors:[]
-errorID
+    data:[{}],
+    massage:"",
+    errors:[],
+    errorID
 }
+```
 
 ## Bikin relasional API // DONE
 
@@ -22,7 +24,8 @@ time, path, method, error massage, request body, UUID // DONE
 
 ## Buat autentikasi // DONE
 
-JWT // DONE, autorisasi // DONE, middleware(buat rate limiter)
+JWT // DONE, autorisasi // DONE,
+middleware(buat rate limiter)
 
 ## Buat benchmark (K6)
 
@@ -36,3 +39,15 @@ manipulasi file dan folder
 ## buat script automasi
 
 ## Jetsh
+
+## Task
+
+1. Transaction
+2. massange brokeer rabbitnq
+3. chaching redish
+4. payment getaway -> Xendit
+5. logging ke file
+6. git simulasi pull request, review
+7. ci/cd , github CI/ github action
+8. gitbucket pipe line
+9. hosting di WSL

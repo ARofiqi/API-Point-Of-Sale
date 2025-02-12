@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -32,6 +33,9 @@ func InitDB() {
 	if err != nil {
 		log.Fatal("Database is not reachable:", err)
 	}
+	DB.SetMaxOpenConns(25)
+	DB.SetMaxIdleConns(25)
+	DB.SetConnMaxLifetime(5 * time.Minute)
 
 	log.Println("Connected to database successfully")
 }
