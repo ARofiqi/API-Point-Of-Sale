@@ -13,12 +13,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3Mzk0MzAzMjcsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOiJhYmQ5MDI5ZC1lODE5LTExZWYtYmE1NC1kMGM1ZDMxODBiY2UifQ.HnemBD3tl5YK0xtli2ewxiiZrm2S-7MwgUu3EGWwkIk"
+var token = "Barier " + "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3Mzk0MzAzMjcsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOiJhYmQ5MDI5ZC1lODE5LTExZWYtYmE1NC1kMGM1ZDMxODBiY2UifQ.HnemBD3tl5YK0xtli2ewxiiZrm2S-7MwgUu3EGWwkIk"
 
 func TestGetProducts(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/products", nil)
-	req.Header.Set("Authorization", "Barier "+token) // Tambahkan token di sini
+	req.Header.Set("Authorization", token) // Tambahkan token di sini
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
@@ -38,7 +38,7 @@ func TestCreateProduct(t *testing.T) {
 	jsonBody, _ := json.Marshal(product)
 	req := httptest.NewRequest(http.MethodPost, "http://localhost:8080/products", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Barier "+token) // Tambahkan token di sini
+	req.Header.Set("Authorization", token) // Tambahkan token di sini
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
@@ -58,7 +58,7 @@ func TestUpdateProduct(t *testing.T) {
 	jsonBody, _ := json.Marshal(product)
 	req := httptest.NewRequest(http.MethodPut, "http://localhost:8080/products/1", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Barier "+token) // Tambahkan token di sini
+	req.Header.Set("Authorization", token) // Tambahkan token di sini
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetParamNames("id")
@@ -73,7 +73,7 @@ func TestDeleteProduct(t *testing.T) {
 	e := echo.New()
 
 	req := httptest.NewRequest(http.MethodDelete, "http://localhost:8080/products/1", nil)
-	req.Header.Set("Authorization", "Barier "+token) // Tambahkan token di sini
+	req.Header.Set("Authorization", token) // Tambahkan token di sini
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetParamNames("id")
@@ -88,7 +88,7 @@ func TestGetProductByID(t *testing.T) {
 	e := echo.New()
 
 	req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/products/1", nil)
-	req.Header.Set("Authorization", "Barier "+token) // Tambahkan token di sini
+	req.Header.Set("Authorization", token) // Tambahkan token di sini
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetParamNames("id")
@@ -102,7 +102,7 @@ func TestGetProductByID(t *testing.T) {
 func TestGetCategoriesWithProducts(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/categories", nil)
-	req.Header.Set("Authorization", "Barier "+token) // Tambahkan token di sini
+	req.Header.Set("Authorization", token) // Tambahkan token di sini
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 

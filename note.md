@@ -24,8 +24,9 @@ time, path, method, error massage, request body, UUID // DONE
 
 ## Buat autentikasi // DONE
 
-JWT // DONE, autorisasi // DONE,
-middleware(buat rate limiter)
+1. JWT // DONE
+2. autorisasi // DONE,
+3. middleware (buat rate limiter)
 
 ## Buat benchmark (K6)
 
@@ -42,7 +43,7 @@ manipulasi file dan folder
 
 ## Task
 
-1. Transaction
+1. Transaction database
 2. massange brokeer rabbitnq
 3. chaching redish
 4. payment getaway -> Xendit

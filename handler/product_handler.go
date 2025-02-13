@@ -58,7 +58,6 @@ func GetProducts(c echo.Context) error {
 	for rows.Next() {
 		var p models.Product
 		if err := rows.Scan(&p.ID, &p.Name, &p.Price, &p.CategoryID, &p.Category); err != nil {
-			utils.LogError(c, "ERR_PARSE_PRODUCTS", "Failed to parse products", err)
 			errorDetails["parsing"] = "Gagal membaca data produk dari database"
 			return utils.Response(c, http.StatusInternalServerError, "Failed to parse products", []models.Product{}, err, errorDetails)
 		}
@@ -66,7 +65,6 @@ func GetProducts(c echo.Context) error {
 	}
 
 	if err = rows.Err(); err != nil {
-		utils.LogError(c, "ERR_ITERATE_ROWS", "Error iterating rows", err)
 		errorDetails["database"] = "Terjadi kesalahan saat membaca hasil query"
 		return utils.Response(c, http.StatusInternalServerError, "Error fetching products", []models.Product{}, err, errorDetails)
 	}
