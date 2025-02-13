@@ -1,16 +1,20 @@
 package models
 
+import (
+	"time"
+)
+
 type Transaction struct {
-	ID    int               `json:"id"`
-	Date  string            `json:"date"`
+	ID    uint              `gorm:"primaryKey" json:"id"`
+	Date  time.Time         `json:"date" gorm:"autoCreateTime"`
 	Total float64           `json:"total"`
-	Items []TransactionItem `json:"items"`
+	Items []TransactionItem `json:"items" gorm:"foreignKey:TransactionID"`
 }
 
 type TransactionItem struct {
-	ID            int     `json:"id"`
-	TransactionID int     `json:"transaction_id"`
-	ProductID     int     `json:"product_id" validate:"required"`
+	ID            uint    `gorm:"primaryKey" json:"id"`
+	TransactionID uint    `json:"transaction_id" gorm:"index"`
+	ProductID     uint    `json:"product_id" validate:"required"`
 	Quantity      int     `json:"quantity" validate:"required,min=1"`
 	SubTotal      float64 `json:"sub_total"`
 }

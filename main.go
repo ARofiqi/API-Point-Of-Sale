@@ -18,6 +18,9 @@ func main() {
 	// }))
 	
 	// e.Use(middleware.RateLimiterMiddleware)
+
+	// db.DB.AutoMigrate(&models.User{}, &models.Product{}, &models.Order{})
+
 	db.InitDB()
 	routes.SetupRoutes(e)
 	e.Start(":8080")

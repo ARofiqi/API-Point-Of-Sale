@@ -2,15 +2,16 @@ package db
 
 import (
 	"aro-shop/config"
-	"database/sql"
 	"fmt"
 	"log"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-var DB *sql.DB
+var DB *gorm.DB
 
 func InitDB() {
 	var cfg = config.LoadConfig()
@@ -21,21 +22,26 @@ func InitDB() {
 	dbPort := cfg.DBPort
 	dbName := cfg.DBName
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPass, dbHost, dbPort, dbName)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", 
+		dbUser, dbPass, dbHost, dbPort, dbName)
 
 	var err error
-	DB, err = sql.Open("mysql", dsn)
+	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
+
 	if err != nil {
 		log.Fatal("Database connection failed:", err)
 	}
 
-	err = DB.Ping()
+	sqlDB, err := DB.DB()
 	if err != nil {
-		log.Fatal("Database is not reachable:", err)
+		log.Fatal("Failed to get database instance:", err)
 	}
-	DB.SetMaxOpenConns(25)
-	DB.SetMaxIdleConns(25)
-	DB.SetConnMaxLifetime(5 * time.Minute)
+
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(25)
+	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
 	log.Println("Connected to database successfully")
 }

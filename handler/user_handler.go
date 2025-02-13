@@ -53,20 +53,21 @@ func Register(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Error hashing password", nil, err, nil)
 	}
 
-	result, err := db.DB.Exec("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)", req.Name, req.Email, string(hashedPassword), "user")
-	if err != nil {
+	user := models.User{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: string(hashedPassword),
+		Role:     models.RoleUser,
+	}
+
+	if err := db.DB.Create(&user).Error; err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to register user", nil, err, nil)
 	}
 
-	userID, err := result.LastInsertId()
-	if err != nil {
-		return utils.Response(c, http.StatusInternalServerError, "Failed to retrieve user ID", nil, err, nil)
-	}
-
 	data := map[string]interface{}{
-		"id":    userID,
-		"name":  req.Name,
-		"email": req.Email,
+		"id":    user.ID,
+		"name":  user.Name,
+		"email": user.Email,
 	}
 
 	return utils.Response(c, http.StatusCreated, "User registered successfully", data, nil, nil)
@@ -86,9 +87,7 @@ func Login(c echo.Context) error {
 	var user models.User
 	email := strings.TrimSpace(strings.ToLower(req.Email))
 
-	row := db.DB.QueryRow("SELECT id, name, email, password, role FROM users WHERE email = ?", email)
-	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.Role)
-	if err != nil {
+	if err := db.DB.Where("email = ?", email).First(&user).Error; err != nil {
 		return utils.Response(c, http.StatusUnauthorized, "Invalid email or password", nil, err, nil)
 	}
 
@@ -101,7 +100,6 @@ func Login(c echo.Context) error {
 		"role":    user.Role,
 		"exp":     time.Now().Add(time.Hour * 24).Unix(),
 	})
-
 	tokenString, err := token.SignedString(jwtSecret)
 	if err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to generate token", nil, err, nil)
@@ -114,7 +112,7 @@ func Login(c echo.Context) error {
 func SetUserRole(c echo.Context) error {
 	userID := c.Param("id")
 	var req struct {
-		Role string `json:"role" validate:"required,oneof=user admin"`
+		Role models.Role `json:"role" validate:"required,oneof=user admin"`
 	}
 
 	if err := c.Bind(&req); err != nil {
@@ -126,8 +124,7 @@ func SetUserRole(c echo.Context) error {
 		return utils.Response(c, http.StatusBadRequest, "Validation error", nil, err, errorDetails)
 	}
 
-	_, err := db.DB.Exec("UPDATE users SET role = ? WHERE id = ?", req.Role, userID)
-	if err != nil {
+	if err := db.DB.Model(&models.User{}).Where("id = ?", userID).Update("role", req.Role).Error; err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to update role", nil, err, nil)
 	}
 
