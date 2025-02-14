@@ -7,15 +7,18 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DB_HOST: db
       DB_USER: root
-      DB_PASSWORD: rootpassword
+      DB_PASS: rootpassword
       DB_NAME: mydb
       DB_PORT: 3306
     networks:
       - app_network
+    command: >
+      sh -c "migrate -database 'mysql://root:rootpassword@tcp(db:3306)/mydb' -path db/migrations up"
 
   db:
     image: mysql:8.0
@@ -32,6 +35,12 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - app_network
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin

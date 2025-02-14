@@ -1,4 +1,4 @@
-# response // DONE
+## response // DONE
 
 ```
 {
@@ -26,9 +26,9 @@ time, path, method, error massage, request body, UUID // DONE
 
 1. JWT // DONE
 2. autorisasi // DONE,
-3. middleware (buat rate limiter)
+3. middleware (buat rate limiter) // DONE
 
-## Buat benchmark (K6)
+## Buat benchmark (K6) // DONE
 
 ## Hosting
 
