@@ -33,7 +33,7 @@ CREATE TABLE users (
     password TEXT NOT NULL
 );
 
-CREATE TABLE category (
+CREATE TABLE categories (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name CHAR(255) NOT NULL
 );

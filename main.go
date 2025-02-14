@@ -6,6 +6,8 @@ import (
 	
 	"github.com/labstack/echo/v4"
 )
+
+// "aro-shop/models"
 // "aro-shop/middleware"
 // "net/http"
 // "github.com/labstack/echo/v4/middleware"
@@ -16,10 +18,10 @@ func main() {
 	// 	AllowOrigins: []string{"http://127.0.0.1:5500", "http://localhost:3000"}, // Sesuaikan dengan domain frontend
 	// 	AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
 	// }))
-	
+
 	// e.Use(middleware.RateLimiterMiddleware)
 
-	// db.DB.AutoMigrate(&models.User{}, &models.Product{}, &models.Order{})
+	// db.DB.AutoMigrate(&models.User{}, &models.Product{}, &models.User{}, &models.Transaction{}, &models.TransactionItem{}, &models.Category{}, &models.Store{})
 
 	db.InitDB()
 	routes.SetupRoutes(e)
