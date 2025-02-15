@@ -2,7 +2,7 @@ package utils
 
 import "github.com/go-playground/validator/v10"
 
-func parseValidationErrors(err error) map[string]string {
+func ParseValidationErrors(err error) map[string]string {
 	errorDetails := make(map[string]string)
 	if validationErrs, ok := err.(validator.ValidationErrors); ok {
 		for _, fieldErr := range validationErrs {

@@ -22,8 +22,7 @@ func InitDB() {
 	dbPort := cfg.DBPort
 	dbName := cfg.DBName
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", 
-		dbUser, dbPass, dbHost, dbPort, dbName)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbUser, dbPass, dbHost, dbPort, dbName)
 
 	var err error
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{

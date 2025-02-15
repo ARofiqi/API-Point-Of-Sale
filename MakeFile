@@ -13,6 +13,9 @@ migrate-down:
 migrate-reset:
 	@$(MIGRATE) down && $(MIGRATE) up
 
+run:
+	go run main.go
+
 
 # migrate -database "mysql://root:@tcp(localhost:3306)/db_aro_shop" -path db/migrations up
 # migrate -database "mysql://root:@tcp(localhost:3306)/db_aro_shop" -path db/migrations down

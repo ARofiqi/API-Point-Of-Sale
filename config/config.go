@@ -8,7 +8,6 @@ import (
 )
 
 type Config struct {
-	AppPort   string
 	DBHost    string
 	DBPort    string
 	DBUser    string
@@ -18,26 +17,24 @@ type Config struct {
 }
 
 func LoadConfig() Config {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Warning: Tidak dapat membaca file .env, menggunakan environment bawaan")
-	}
+	_ = godotenv.Load()
 
-	return Config{
-		AppPort:   getEnv("APP_PORT", "8080"),
+	config := Config{
 		DBHost:    getEnv("DB_HOST", "localhost"),
 		DBPort:    getEnv("DB_PORT", "3306"),
 		DBUser:    getEnv("DB_USER", "root"),
-		DBPass:    getEnv("DB_PASSWORD", ""),
-		DBName:    getEnv("DB_NAME", "db_aro_shop"),
+		DBPass:    getEnv("DB_PASS", ""),
+		DBName:    getEnv("DB_NAME", "testdb"),
 		JWTSecret: getEnv("JWT_SECRET", "defaultsecret"),
 	}
+
+	log.Printf("Config loaded: %+v\n", config)
+	return config
 }
 
 func getEnv(key, defaultValue string) string {
-	value, exists := os.LookupEnv(key)
-	if !exists {
-		return defaultValue
+	if value, exists := os.LookupEnv(key); exists {
+		return value
 	}
-	return value
+	return defaultValue
 }

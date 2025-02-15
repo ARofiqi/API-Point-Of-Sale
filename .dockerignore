@@ -1,0 +1,23 @@
+# Mengabaikan direktori node_modules
+node_modules/
+
+# Mengabaikan file konfigurasi IDE
+.vscode/
+.idea/
+
+# Mengabaikan file log dan cache
+*.log
+*.cache
+tmp/
+
+# Mengabaikan file environment (jangan sertakan kredensial)
+.env
+.env.local
+
+# Mengabaikan file Git
+.git
+.gitignore
+
+# Mengabaikan file dan folder tertentu
+Dockerfile
+docker-compose.yml

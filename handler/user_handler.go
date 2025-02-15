@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -20,23 +19,6 @@ var (
 	jwtSecret = []byte(cfg.JWTSecret)
 )
 
-func parseValidationErrors(err error) map[string]string {
-	errorDetails := make(map[string]string)
-	if validationErrs, ok := err.(validator.ValidationErrors); ok {
-		for _, fieldErr := range validationErrs {
-			switch fieldErr.Tag() {
-			case "required":
-				errorDetails[fieldErr.Field()] = "Tidak boleh kosong"
-			case "email":
-				errorDetails[fieldErr.Field()] = "Format email tidak valid"
-			case "min":
-				errorDetails[fieldErr.Field()] = "Minimal " + fieldErr.Param() + " karakter"
-			}
-		}
-	}
-	return errorDetails
-}
-
 func Register(c echo.Context) error {
 	var req models.RegisterRequest
 	if err := c.Bind(&req); err != nil {
@@ -44,7 +26,7 @@ func Register(c echo.Context) error {
 	}
 
 	if err := validate.Struct(req); err != nil {
-		errorDetails := parseValidationErrors(err)
+		errorDetails := utils.ParseValidationErrors(err)
 		return utils.Response(c, http.StatusBadRequest, "Validation error", nil, err, errorDetails)
 	}
 
@@ -80,7 +62,7 @@ func Login(c echo.Context) error {
 	}
 
 	if err := validate.Struct(req); err != nil {
-		errorDetails := parseValidationErrors(err)
+		errorDetails := utils.ParseValidationErrors(err)
 		return utils.Response(c, http.StatusBadRequest, "Validation error", nil, err, errorDetails)
 	}
 
@@ -120,7 +102,7 @@ func SetUserRole(c echo.Context) error {
 	}
 
 	if err := validate.Struct(req); err != nil {
-		errorDetails := parseValidationErrors(err)
+		errorDetails := utils.ParseValidationErrors(err)
 		return utils.Response(c, http.StatusBadRequest, "Validation error", nil, err, errorDetails)
 	}
 
