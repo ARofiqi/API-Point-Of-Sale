@@ -1,6 +1,6 @@
 services:
   backend:
-    image: "${{ secrets.DOCKER_USERNAME }}/my-go-app:latest" 
+    image: rofiqi/my-go-app:latest
     container_name: golang_api
     ports:
       - "8080:8080"
