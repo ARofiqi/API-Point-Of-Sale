@@ -78,6 +78,8 @@ jobs:
               sudo apt-get install -y docker-compose
             fi
 
+            docker login --username "${{ secrets.DOCKER_USERNAME }}" --password "${{ secrets.DOCKER_PASSWORD }}"
+            
             # Pull latest Docker image
             docker pull ${{ secrets.DOCKER_USERNAME }}/my-go-app:latest
             
