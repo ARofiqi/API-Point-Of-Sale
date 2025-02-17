@@ -1,4 +1,4 @@
-name: CI/CD Deployment to VPS (Golang)
+name: CI/CD Deployment to VPS (Golang with Docker Compose)
 
 on:
   push:
@@ -13,15 +13,14 @@ jobs:
       - name: Checkout kode
         uses: actions/checkout@v3
 
-      - name: Setup Golang
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.23
-
-      - name: Build aplikasi
+      - name: Setup Docker
         run: |
-          go mod tidy
-          go build -o myapp main.go
+          sudo apt-get update
+          sudo apt-get install -y docker.io docker-compose
+
+      - name: Build Docker image
+        run: |
+          docker-compose build
 
       - name: Setup SSH Key
         run: |
@@ -30,13 +29,19 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
 
-      - name: Deploy ke VPS
+      - name: Deploy dengan Docker Compose ke VPS
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_IP }} << 'EOF'
-            cd /var/www/myapp/API-Point-Of-Sale || exit 1
-            git pull origin main || exit 1
-            go build -o myapp/API-Point-Of-Sale main.go || exit 1
-            sudo systemctl restart myapp.service || exit 1
-          EOF
+            # Pastikan Docker Compose sudah terpasang di VPS
+            docker-compose -v || exit 1
 
-  
+            # Pindah ke direktori aplikasi di VPS
+            cd /var/www/myapp || exit 1
+
+            # Ambil perubahan terbaru dari Git
+            git pull origin main || exit 1
+
+            # Bangun ulang Docker image dan jalankan container
+            docker-compose down || exit 1
+            docker-compose up -d --build || exit 1
+          EOF
