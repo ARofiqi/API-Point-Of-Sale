@@ -33,7 +33,7 @@ jobs:
       - name: Deploy ke VPS
         run: |
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_IP }} << 'EOF'
-            cd /var/www/app
+            cd /var/www/
             git pull origin main
             go build -o myapp main.go
             systemctl restart myapp.service
