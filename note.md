@@ -35,7 +35,7 @@ time, path, method, error massage, request body, UUID // DONE
 (Reverse Proxy)
 
 Linux(Permission and Ownership)
-manipulasi file dan folder
+manipulasi file dan folder // DONE
 
 ## buat script automasi
 
