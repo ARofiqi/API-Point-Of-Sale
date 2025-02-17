@@ -1,47 +1,54 @@
-name: CI/CD Deployment to VPS (Golang with Docker Compose)
+name: Go with Docker Compose
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout kode
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-      - name: Setup Docker
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.23"
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build Go application
         run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose docker.io 
+          go mod tidy
+          go build -o app .
 
       - name: Build Docker image
         run: |
-          docker-compose build
+          docker build -t my-go-app .
 
-      - name: Setup SSH Key
+      - name: Push Docker image to Docker Hub
+        if: github.event_name == 'push'
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
+          echo ${{ secrets.DOCKER_USERNAME }} | docker login --username ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker tag my-go-app ${{ secrets.DOCKER_USERNAME }}/my-go-app:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/my-go-app:latest
 
-      - name: Deploy dengan Docker Compose ke VPS
+      - name: Deploy to VPS using SSH with Docker Compose
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_IP }} << 'EOF'
-            # Pastikan Docker Compose sudah terpasang di VPS
-            docker-compose -v || exit 1
-
-            # Pindah ke direktori aplikasi di VPS
-            cd /var/www/myapp || exit 1
-
-            # Ambil perubahan terbaru dari Git
-            git pull origin main || exit 1
-
-            # Bangun ulang Docker image dan jalankan container
-            docker-compose down || exit 1
-            docker-compose up -d --build || exit 1
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_IP }} << 'EOF'
+            sudo apt-get update
+            sudo apt-get install -y docker-compose
+            docker pull ${{ secrets.DOCKER_USERNAME }}/my-go-app:latest
+            cd /home/${{ secrets.VPS_USER }}/my-go-app || exit
+            sudo docker-compose down
+            sudo docker-compose up -d
           EOF
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
