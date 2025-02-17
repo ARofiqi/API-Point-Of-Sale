@@ -47,10 +47,24 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "${{ secrets.VPS_IP }}" >> ~/.ssh/known_hosts
 
+      - name: Copy docker-compose.yml to VPS
+        run: |
+          scp -i ~/.ssh/id_rsa docker-compose.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_IP }}:/home/${{ secrets.VPS_USER }}/my-go-app/"
+
       - name: Deploy to VPS using SSH with Docker Compose
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_IP }} << 'EOF'
             set -e
+            
+            # Navigate to deployment directory
+            cd /home/${{ secrets.VPS_USER }}/my-go-app
+            
+            # Debug: Check if docker-compose.yml exists
+            ls -lah
+            if [ ! -f "docker-compose.yml" ]; then
+              echo "Error: docker-compose.yml not found!"
+              exit 1
+            fi
             
             # Update system
             sudo apt-get update
@@ -64,18 +78,15 @@ jobs:
               sudo apt-get install -y docker-compose
             fi
 
-            # Navigate to deployment directory
-            cd /home/${{ secrets.VPS_USER }}/my-go-app || mkdir -p /home/${{ secrets.VPS_USER }}/my-go-app && cd /home/${{ secrets.VPS_USER }}/my-go-app
-
             # Pull latest Docker image
             docker pull ${{ secrets.DOCKER_USERNAME }}/my-go-app:latest
-
+            
             # Stop and remove old containers
             docker-compose down
-
+            
             # Remove old images
             docker system prune -f
-
+            
             # Start new deployment
             docker-compose up -d --remove-orphans
           EOF
