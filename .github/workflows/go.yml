@@ -21,7 +21,7 @@ jobs:
       - name: Build aplikasi
         run: |
           go mod tidy
-          go build -o API-Point-Of-Sale main.go
+          go build -o myapp main.go
 
       - name: Setup SSH Key
         run: |
@@ -35,8 +35,8 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_IP }} << 'EOF'
             cd /var/www/myapp/API-Point-Of-Sale || exit 1
             git pull origin main || exit 1
-            go build -o API-Point-Of-Sale main.go || exit 1
-            sudo systemctl restart API-Point-Of-Sale.service || exit 1
+            go build -o myapp/API-Point-Of-Sale main.go || exit 1
+            sudo systemctl restart myapp.service || exit 1
           EOF
 
   
