@@ -33,8 +33,11 @@ jobs:
       - name: Deploy ke VPS
         run: |
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_IP }} << 'EOF'
-            cd /var/www/
+            cd /var/www/app || git clone git@github.com:ARofiqi/API-Point-Of-Sale.git /var/www/app
+            cd /var/www/app
+            git reset --hard
             git pull origin main
+            go mod tidy
             go build -o myapp main.go
             systemctl restart myapp.service
           EOF
