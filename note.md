@@ -43,7 +43,7 @@ manipulasi file dan folder // DONE
 
 ## Task
 
-1. Transaction database
+1. Transaction database // DONE
 2. massange brokeer rabbitnq
 3. chaching redish
 4. payment getaway -> Xendit

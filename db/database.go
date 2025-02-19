@@ -14,15 +14,11 @@ import (
 var DB *gorm.DB
 
 func InitDB() {
-	var cfg = config.LoadConfig()
+	cfg := config.LoadConfig()
 
-	dbUser := cfg.DBUser
-	dbPass := cfg.DBPass
-	dbHost := cfg.DBHost
-	dbPort := cfg.DBPort
-	dbName := cfg.DBName
-
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbUser, dbPass, dbHost, dbPort, dbName)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName,
+	)
 
 	var err error
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
