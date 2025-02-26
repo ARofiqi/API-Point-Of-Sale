@@ -49,6 +49,6 @@ manipulasi file dan folder // DONE
 4. payment getaway -> Xendita
 5. logging ke file
 6. git simulasi pull request, review 
-7. ci/cd , github CI/ github action 
+7. ci/cd , github CI/ github action // DONE
 8. gitbucket pipe line 
 9. hosting di WSL 
