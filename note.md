@@ -45,10 +45,10 @@ manipulasi file dan folder // DONE
 
 1. Transaction database // DONE
 2. massage broker RabbitMQ // DONE
-3. chaching redish 
-4. payment getaway -> Xendita
-5. logging ke file
-6. git simulasi pull request, review 
+3. chaching redish
+4. payment getaway -> Xendit
+5. logging ke file // DONE
+6. git simulasi pull request, review // DONE
 7. ci/cd , github CI/ github action // DONE
-8. gitbucket pipe line 
-9. hosting di WSL 
+8. gitbucket pipe line
+9. hosting di WSL

@@ -33,7 +33,6 @@ func LogError(c echo.Context, errorID string, message string, err error) {
 		}
 	}
 
-	// Pastikan body kosong diubah menjadi null agar lebih informatif
 	var requestData interface{} = nil
 	if len(requestBody) > 0 {
 		requestData = requestBody
