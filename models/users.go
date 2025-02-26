@@ -13,14 +13,16 @@ const (
 )
 
 type User struct {
-	ID       string `json:"id" gorm:"type:char(36);primaryKey"`
-	Name     string `json:"name" gorm:"not null"`
-	Email    string `json:"email" gorm:"unique;not null"`
-	Password string `json:"-" gorm:"not null"`
-	Role     Role   `json:"role" gorm:"not null;default:user"`
+	ID       uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Name     string    `json:"name" gorm:"not null"`
+	Email    string    `json:"email" gorm:"unique;not null"`
+	Password string    `json:"-" gorm:"not null"`
+	Role     Role      `json:"role" gorm:"type:varchar(10);not null;default:'user'"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
-	u.ID = uuid.New().String()
+	if u.ID == uuid.Nil {
+		u.ID = uuid.New()
+	}
 	return
 }

@@ -4,9 +4,7 @@ import (
 	"aro-shop/config"
 	"aro-shop/db"
 	"aro-shop/middlewares"
-	"aro-shop/models"
 	"aro-shop/routes"
-	"log"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -37,13 +35,6 @@ func main() {
 	}
 
 	db.InitDB()
-
-	if APPEnv == "development" {
-		err := db.DB.AutoMigrate(&models.User{}, &models.Product{}, &models.Transaction{}, &models.TransactionItem{}, &models.Category{})
-		if err != nil {
-			log.Fatal("Migration failed:", err)
-		}
-	}
 
 	routes.SetupRoutes(e)
 	e.Start(":8080")
