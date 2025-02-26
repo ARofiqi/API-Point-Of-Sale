@@ -14,6 +14,8 @@ type Config struct {
 	DBPass    string
 	DBName    string
 	JWTSecret string
+	REDISHost string
+	REDISPort string
 }
 
 func LoadConfig() Config {
@@ -27,6 +29,8 @@ func LoadConfig() Config {
 		DBPass:    getEnv("DB_PASS", ""),
 		DBName:    getEnv("DB_NAME", "testdb"),
 		JWTSecret: getEnv("JWT_SECRET", "defaultsecret"),
+		REDISHost: getEnv("REDIS_HOST", "redis"),
+		REDISPort: getEnv("REDIS_PORT", "6379"),
 	}
 	return config
 }
