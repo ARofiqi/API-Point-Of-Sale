@@ -1,6 +1,7 @@
 package test
 
 import (
+	"aro-shop/db"
 	"aro-shop/handler"
 	"aro-shop/models"
 	"bytes"
@@ -9,15 +10,32 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
-var token = "Barier " + "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3Mzk0MzAzMjcsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOiJhYmQ5MDI5ZC1lODE5LTExZWYtYmE1NC1kMGM1ZDMxODBiY2UifQ.HnemBD3tl5YK0xtli2ewxiiZrm2S-7MwgUu3EGWwkIk"
+var token = "Bearer " + "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NDA1NTY5MjgsInJvbGUiOiJ1c2VyIiwidXNlcl9pZCI6IjY5MmIxODEyLTYzMmEtNDRlZi05MWM5LTgzYmE2ZmY4MDgwNiJ9.JsA9xK9L-K99juqysXlWSpglndRuaafKrOHI_G2embU"
+
+var mock sqlmock.Sqlmock
+
+func SetupMockDB() {
+	sqlDB, mockDB, _ := sqlmock.New()
+	mock = mockDB
+
+	gormDB, _ := gorm.Open(mysql.New(mysql.Config{
+		Conn: sqlDB,
+	}), &gorm.Config{})
+
+	db.DB = gormDB
+}
 
 func TestGetProducts(t *testing.T) {
+	SetupMockDB()
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/products", nil)
+	req := httptest.NewRequest(http.MethodGet, "/products", nil)
 	req.Header.Set("Authorization", token)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -28,6 +46,7 @@ func TestGetProducts(t *testing.T) {
 }
 
 func TestCreateProduct(t *testing.T) {
+	SetupMockDB()
 	e := echo.New()
 
 	product := models.Product{
@@ -36,9 +55,9 @@ func TestCreateProduct(t *testing.T) {
 		CategoryID: 1,
 	}
 	jsonBody, _ := json.Marshal(product)
-	req := httptest.NewRequest(http.MethodPost, "http://localhost:8080/products", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", token) // Tambahkan token di sini
+	req.Header.Set("Authorization", token)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
@@ -48,6 +67,7 @@ func TestCreateProduct(t *testing.T) {
 }
 
 func TestUpdateProduct(t *testing.T) {
+	SetupMockDB()
 	e := echo.New()
 
 	product := models.Product{
@@ -56,7 +76,7 @@ func TestUpdateProduct(t *testing.T) {
 		CategoryID: 1,
 	}
 	jsonBody, _ := json.Marshal(product)
-	req := httptest.NewRequest(http.MethodPut, "http://localhost:8080/products/1", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPut, "/products/1", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", token)
 	rec := httptest.NewRecorder()
@@ -70,9 +90,10 @@ func TestUpdateProduct(t *testing.T) {
 }
 
 func TestDeleteProduct(t *testing.T) {
+	SetupMockDB()
 	e := echo.New()
 
-	req := httptest.NewRequest(http.MethodDelete, "http://localhost:8080/products/1", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/products/1", nil)
 	req.Header.Set("Authorization", token)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -85,9 +106,10 @@ func TestDeleteProduct(t *testing.T) {
 }
 
 func TestGetProductByID(t *testing.T) {
+	SetupMockDB()
 	e := echo.New()
 
-	req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/products/1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/products/1", nil)
 	req.Header.Set("Authorization", token)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -100,8 +122,9 @@ func TestGetProductByID(t *testing.T) {
 }
 
 func TestGetCategoriesWithProducts(t *testing.T) {
+	SetupMockDB()
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/categories", nil)
+	req := httptest.NewRequest(http.MethodGet, "/categories", nil)
 	req.Header.Set("Authorization", token)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)

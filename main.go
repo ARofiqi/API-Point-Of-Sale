@@ -32,7 +32,9 @@ func main() {
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
 	}))
 
-	e.Use(middlewares.RateLimiterMiddleware)
+	if false {
+		e.Use(middlewares.RateLimiterMiddleware)
+	}
 
 	db.InitDB()
 

@@ -16,6 +16,7 @@ type Config struct {
 	JWTSecret string
 	REDISHost string
 	REDISPort string
+	TESTMode  string
 }
 
 func LoadConfig() Config {
@@ -31,6 +32,7 @@ func LoadConfig() Config {
 		JWTSecret: getEnv("JWT_SECRET", "defaultsecret"),
 		REDISHost: getEnv("REDIS_HOST", "redis"),
 		REDISPort: getEnv("REDIS_PORT", "6379"),
+		TESTMode:  getEnv("TEST_MODE", "true"),
 	}
 	return config
 }
