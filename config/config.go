@@ -1,13 +1,13 @@
 package config
 
 import (
-	"log"
 	"os"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
+	APPEnv    string
 	DBHost    string
 	DBPort    string
 	DBUser    string
@@ -20,6 +20,7 @@ func LoadConfig() Config {
 	_ = godotenv.Load()
 
 	config := Config{
+		APPEnv:    getEnv("APP_ENV", "development"),
 		DBHost:    getEnv("DB_HOST", "localhost"),
 		DBPort:    getEnv("DB_PORT", "3306"),
 		DBUser:    getEnv("DB_USER", "root"),
@@ -27,8 +28,6 @@ func LoadConfig() Config {
 		DBName:    getEnv("DB_NAME", "testdb"),
 		JWTSecret: getEnv("JWT_SECRET", "defaultsecret"),
 	}
-
-	log.Printf("Config loaded: %+v\n", config)
 	return config
 }
 

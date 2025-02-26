@@ -2,7 +2,7 @@ package routes
 
 import (
 	"aro-shop/handler"
-	"aro-shop/middleware"
+	"aro-shop/middlewares"
 
 	"github.com/labstack/echo/v4"
 )
@@ -12,7 +12,7 @@ func SetupRoutes(e *echo.Echo) {
 	e.POST("/login", handler.Login)
 
 	authGroup := e.Group("")
-	authGroup.Use(middleware.JWTMiddleware)
+	authGroup.Use(middlewares.JWTMiddleware)
 
 	authGroup.GET("/products", handler.GetProducts)
 	authGroup.GET("/products/:id", handler.GetProductByID)
@@ -22,11 +22,11 @@ func SetupRoutes(e *echo.Echo) {
 	authGroup.GET("/transactions/:id/subtotal", handler.GetTransactionSubtotal)
 
 	adminGroup := e.Group("")
-	adminGroup.Use(middleware.JWTMiddleware, middleware.RoleMiddleware("admin"))
+	adminGroup.Use(middlewares.JWTMiddleware, middlewares.RoleMiddleware("admin"))
 
 	adminGroup.POST("/products", handler.CreateProduct)
 	adminGroup.PUT("/products/:id", handler.UpdateProduct)
-	adminGroup.DELETE("/products/:id", handler.DeleteProduct)
+	adminGroup.DELETE("/products	/:id", handler.DeleteProduct)
 	adminGroup.POST("/transactions", handler.CreateTransaction)
 	adminGroup.PUT("/users/:id/role", handler.SetUserRole)
 }

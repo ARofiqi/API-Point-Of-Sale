@@ -5,14 +5,14 @@ import (
 )
 
 type Transaction struct {
-	ID    uint              `gorm:"primaryKey" json:"id"`
+	ID    uint              `json:"id" gorm:"primaryKey"`
 	Date  time.Time         `json:"date" gorm:"autoCreateTime"`
 	Total float64           `json:"total"`
 	Items []TransactionItem `json:"items" gorm:"foreignKey:TransactionID"`
 }
 
 type TransactionItem struct {
-	ID            uint    `gorm:"primaryKey" json:"id"`
+	ID            uint    `json:"id" gorm:"primaryKey"`
 	TransactionID uint    `json:"transaction_id" gorm:"index"`
 	ProductID     uint    `json:"product_id" validate:"required"`
 	Quantity      int     `json:"quantity" validate:"required,min=1"`

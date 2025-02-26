@@ -2,7 +2,7 @@ package utils
 
 import "github.com/go-playground/validator/v10"
 
-func formatValidationErrors(err error) map[string]string {
+func FormatValidationErrors(err error) map[string]string {
 	errors := make(map[string]string)
 
 	if validationErrs, ok := err.(validator.ValidationErrors); ok {

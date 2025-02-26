@@ -1,10 +1,9 @@
-version: "3.8"
-
 services:
   db:
     image: mysql:8.0
     container_name: aro-shop-db
     restart: always
+    command: --default-authentication-plugin=mysql_native_password
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: aro_shop
@@ -14,13 +13,35 @@ services:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    container_name: aro-shop-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   app:
     build: .
     container_name: aro-shop-app
     restart: always
+    volumes:
+      - .:/app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
@@ -29,6 +50,8 @@ services:
       DB_HOST: db
       DB_PORT: 3306
       DB_NAME: aro_shop
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
 
 volumes:
   db_data:

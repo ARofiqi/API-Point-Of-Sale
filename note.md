@@ -37,18 +37,18 @@ time, path, method, error massage, request body, UUID // DONE
 Linux(Permission and Ownership) // DONE
 manipulasi file dan folder // DONE
 
-## buat script automasi
+## buat script automasi // DONE
 
 ## Jetsh
 
 ## Task
 
 1. Transaction database // DONE
-2. massange brokeer rabbitnq
-3. chaching redish
-4. payment getaway -> Xendit
+2. massage broker RabbitMQ // DONE
+3. chaching redish 
+4. payment getaway -> Xendita
 5. logging ke file
-6. git simulasi pull request, review
-7. ci/cd , github CI/ github action
-8. gitbucket pipe line
-9. hosting di WSL
+6. git simulasi pull request, review 
+7. ci/cd , github CI/ github action 
+8. gitbucket pipe line 
+9. hosting di WSL 
