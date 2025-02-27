@@ -19,17 +19,24 @@ func GetTransactions(c echo.Context) error {
 }
 
 func CreateTransaction(c echo.Context) error {
-	var t models.Transaction
+	var (
+		t            models.Transaction
+		errorDetails = make(map[string]string)
+	)
+
 	if err := c.Bind(&t); err != nil {
-		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, nil)
+		errorDetails = utils.ParseValidationErrors(err)
+		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, errorDetails)
 	}
 
 	if err := validate.Struct(t); err != nil {
-		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, err, nil)
+		errorDetails = utils.ParseValidationErrors(err)
+		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, err, errorDetails)
 	}
 
 	if len(t.Items) == 0 {
-		return utils.Response(c, http.StatusBadRequest, "Transaction must contain at least one item", nil, nil, nil)
+		errorDetails["items"] = "Transaction must contain at least one item"
+		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, nil, errorDetails)
 	}
 
 	t.Date = time.Now()
@@ -46,6 +53,7 @@ func CreateTransaction(c echo.Context) error {
 			tx.Rollback()
 			return utils.Response(c, http.StatusNotFound, "Product not found", nil, err, nil)
 		}
+
 		t.Items[i].SubTotal = float64(t.Items[i].Quantity) * price
 		t.Items[i].TransactionID = t.ID
 		total += t.Items[i].SubTotal
@@ -67,10 +75,15 @@ func CreateTransaction(c echo.Context) error {
 }
 
 func GetTransactionSubtotal(c echo.Context) error {
-	var transaction models.Transaction
+	var (
+		transaction  models.Transaction
+		errorDetails = make(map[string]string)
+	)
+
 	transactionID := c.Param("id")
 	if err := db.DB.Preload("Items").First(&transaction, transactionID).Error; err != nil {
-		return utils.Response(c, http.StatusNotFound, "Transaction not found", nil, err, nil)
+		errorDetails = utils.ParseValidationErrors(err)
+		return utils.Response(c, http.StatusNotFound, "Transaction not found", nil, err, errorDetails)
 	}
 
 	subtotal := 0.0
@@ -87,10 +100,12 @@ func GetTransactionSubtotal(c echo.Context) error {
 }
 
 func GetTransactionsByDateRange(c echo.Context) error {
-	errorDetails := make(map[string]string)
 
-	startDate := c.QueryParam("start")
-	endDate := c.QueryParam("end")
+	var (
+		errorDetails = make(map[string]string)
+		startDate    = c.QueryParam("start")
+		endDate      = c.QueryParam("end")
+	)
 
 	if startDate == "" || endDate == "" {
 		errorDetails["date_range_error"] = "Start date dan end date diperlukan"
@@ -99,7 +114,8 @@ func GetTransactionsByDateRange(c echo.Context) error {
 
 	var transactions []models.Transaction
 	if err := db.DB.Preload("Items").Where("date BETWEEN ? AND ?", startDate, endDate).Find(&transactions).Error; err != nil {
-		errorDetails["query_error"] = "Gagal mengambil transaksi berdasarkan rentang tanggal"
+		// errorDetails["query_error"] = "Gagal mengambil transaksi berdasarkan rentang tanggal"
+		errorDetails = utils.ParseValidationErrors(err)
 		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch transactions by date range", nil, err, errorDetails)
 	}
 

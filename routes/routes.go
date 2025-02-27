@@ -29,4 +29,10 @@ func SetupRoutes(e *echo.Echo) {
 	adminGroup.DELETE("/products	/:id", handler.DeleteProduct)
 	adminGroup.POST("/transactions", handler.CreateTransaction)
 	adminGroup.PUT("/users/:id/role", handler.SetUserRole)
+
+	authGroup.GET("/categories", handler.GetCategories)
+	authGroup.GET("/categories/:id", handler.GetCategory)
+	adminGroup.POST("/categories", handler.CreateCategory)
+	adminGroup.PUT("/categories/:id", handler.UpdateCategory)
+	adminGroup.DELETE("/categories/:id", handler.DeleteCategory)
 }

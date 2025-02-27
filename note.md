@@ -52,3 +52,7 @@ manipulasi file dan folder // DONE
 7. ci/cd , github CI/ github action // DONE
 8. gitbucket pipe line
 9. hosting di WSL
+
+1. Simulasi pembayaran di local tanpa terhubung ke xendit
+2. Mengelola user dan grup di linux
+3. 
