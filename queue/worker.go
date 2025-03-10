@@ -3,40 +3,113 @@ package queue
 import (
 	"aro-shop/db"
 	"aro-shop/models"
+	"aro-shop/utils"
 	"encoding/json"
+	"fmt"
 	"log"
+	"time"
 )
 
-// StartWorker menjalankan worker untuk memproses transaksi dari RabbitMQ
+// StartTransactionWorker memproses transaksi dari RabbitMQ
+func StartTransactionWorker() {
+	for {
+		if err := ensureChannel(); err != nil {
+			log.Println("⚠️ Worker transaksi menunggu koneksi RabbitMQ pulih...")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		msgs, err := rabbitMQChannel.Consume(
+			transactionQueue, // Queue Name
+			"",               // Consumer
+			true,             // Auto-Ack
+			false,            // Exclusive
+			false,            // No-local
+			false,            // No-wait
+			nil,              // Args
+		)
+		if err != nil {
+			log.Printf("❌ Gagal mengkonsumsi pesan dari queue transaksi: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		log.Println("👷 Worker transaksi berjalan...")
+
+		for msg := range msgs {
+			var t models.Transaction
+			if err := json.Unmarshal(msg.Body, &t); err != nil {
+				log.Println("❌ Gagal parsing transaksi:", err)
+				continue
+			}
+
+			// Simpan transaksi ke database
+			if err := db.DB.Create(&t).Error; err != nil {
+				log.Println("❌ Gagal menyimpan transaksi:", err)
+				continue
+			}
+
+			log.Println("✅ Transaksi berhasil disimpan ke database:", t.ID)
+		}
+	}
+}
+
+// StartNotificationWorker memproses notifikasi dari RabbitMQ
+func StartNotificationWorker() {
+	for {
+		if err := ensureChannel(); err != nil {
+			log.Println("⚠️ Worker notifikasi menunggu koneksi RabbitMQ pulih...")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		msgs, err := rabbitMQChannel.Consume(
+			notificationQueue,
+			"",
+			true,  // auto-ack
+			false, // exclusive
+			false, // no-local
+			false, // no-wait
+			nil,   // args
+		)
+		if err != nil {
+			log.Printf("❌ Gagal mengkonsumsi pesan dari queue notifikasi: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		log.Println("👷 Worker notifikasi berjalan...")
+
+		for msg := range msgs {
+			message := string(msg.Body)
+			fmt.Printf("📩 New Notification: %s\n", message)
+
+			err := CreateNotification(message)
+			if err != nil {
+				log.Printf("❌ Gagal menyimpan notifikasi: %v", err)
+			}
+		}
+	}
+}
+
+// CreateNotification menyimpan notifikasi ke database
+func CreateNotification(message string) error {
+	notification := models.Notification{
+		Message:   message,
+		IsRead:    false,
+		CreatedAt: utils.GetCurrentTime(),
+	}
+
+	if err := db.DB.Create(&notification).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// StartWorker menjalankan kedua worker dalam goroutine
 func StartWorker() {
-	msgs, err := rabbitMQChannel.Consume(
-		queueName, // Queue Name
-		"",        // Consumer
-		true,      // Auto-Ack
-		false,     // Exclusive
-		false,     // No-local
-		false,     // No-wait
-		nil,       // Args
-	)
-	if err != nil {
-		log.Fatalf("❌ Gagal mengkonsumsi pesan dari queue: %v", err)
-	}
+	go StartTransactionWorker()
+	go StartNotificationWorker()
 
-	log.Println("👷 Worker transaksi berjalan...")
-
-	for msg := range msgs {
-		var t models.Transaction
-		if err := json.Unmarshal(msg.Body, &t); err != nil {
-			log.Println("❌ Gagal parsing transaksi:", err)
-			continue
-		}
-
-		// Simpan transaksi ke database
-		if err := db.DB.Create(&t).Error; err != nil {
-			log.Println("❌ Gagal menyimpan transaksi:", err)
-			continue
-		}
-
-		log.Println("✅ Transaksi berhasil disimpan ke database:", t.ID)
-	}
+	log.Println("🚀 Semua worker berjalan...")
 }

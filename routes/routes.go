@@ -20,6 +20,8 @@ func SetupRoutes(e *echo.Echo) {
 	authGroup.GET("/transactions", handler.GetTransactions)
 	authGroup.GET("/transactions/date", handler.GetTransactionsByDateRange)
 	authGroup.GET("/transactions/:id/subtotal", handler.GetTransactionSubtotal)
+	authGroup.GET("/notifications", handler.GetNotifications)
+	authGroup.PUT("/notifications/:id/read", handler.MarkNotificationAsRead)
 
 	adminGroup := e.Group("")
 	adminGroup.Use(middlewares.JWTMiddleware, middlewares.RoleMiddleware("admin"))

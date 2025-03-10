@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-func main() {
+func Migrate() {
 	InitDB()
 
 	log.Println("Starting database migration...")
@@ -13,9 +13,10 @@ func main() {
 	err := DB.AutoMigrate(
 		&models.User{},
 		&models.Product{},
-		&models.Transaction{},
 		&models.TransactionItem{},
+		&models.Transaction{},
 		&models.Category{},
+		&models.Notification{},
 	)
 	if err != nil {
 		log.Fatal("Migration failed : ", err)

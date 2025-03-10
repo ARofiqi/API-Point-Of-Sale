@@ -6,7 +6,6 @@ import (
 	"aro-shop/queue"
 	"aro-shop/utils"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -30,38 +29,41 @@ func CreateTransaction(c echo.Context) error {
 	// Bind request body ke struct
 	if err := c.Bind(&t); err != nil {
 		errorDetails = utils.ParseValidationErrors(err)
-		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, errorDetails)
+		return utils.Response(c, http.StatusBadRequest, "Format permintaan tidak valid", nil, err, errorDetails)
 	}
 
 	// Validasi input
 	if err := validate.Struct(t); err != nil {
 		errorDetails = utils.ParseValidationErrors(err)
-		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, err, errorDetails)
+		return utils.Response(c, http.StatusBadRequest, "Validasi gagal", nil, err, errorDetails)
 	}
 
-	// Pastikan ada item di transaksi
 	if len(t.Items) == 0 {
-		errorDetails["items"] = "Transaction must contain at least one item"
-		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, nil, errorDetails)
+		errorDetails["items"] = "Transaksi harus memiliki setidaknya satu item"
+		return utils.Response(c, http.StatusBadRequest, "Validasi gagal", nil, nil, errorDetails)
 	}
 
-	// Tambahkan timestamp transaksi
+	// Set tanggal transaksi
 	t.Date = time.Now()
 
-	// Serialisasi transaksi ke JSON
+	// Serialize transaksi ke JSON
 	transactionJSON, err := json.Marshal(t)
 	if err != nil {
-		return utils.Response(c, http.StatusInternalServerError, "Failed to serialize transaction", nil, err, nil)
+		return utils.Response(c, http.StatusInternalServerError, "Gagal serialisasi transaksi", nil, err, nil)
 	}
 
-	// Kirim ke RabbitMQ menggunakan goroutine agar tidak blocking
-	go func() {
-		if err := queue.PublishTransaction(transactionJSON); err != nil {
-			fmt.Println("❌ Gagal mengirim transaksi ke queue:", err)
-		}
-	}()
+	// Kirim transaksi ke RabbitMQ
+	if err := queue.PublishTransaction(transactionJSON); err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Gagal mengirim transaksi ke antrian", nil, err, nil)
+	}
 
-	return utils.Response(c, http.StatusAccepted, "Transaction enqueued successfully", nil, nil, nil)
+	// Kirim notifikasi ke RabbitMQ
+	notificationMessage := "Transaksi baru telah dibuat"
+	if err := queue.PublishNotification(notificationMessage); err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Gagal mengirim notifikasi", nil, err, nil)
+	}
+
+	return utils.Response(c, http.StatusAccepted, "Transaksi berhasil dikirim ke antrian", nil, nil, nil)
 }
 
 func GetTransactionSubtotal(c echo.Context) error {
