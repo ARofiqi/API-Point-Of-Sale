@@ -6,6 +6,7 @@ import (
 	"aro-shop/middlewares"
 	"aro-shop/queue"
 	"aro-shop/routes"
+	"aro-shop/cache"
 	"fmt"
 	"net/http"
 	"os"
@@ -32,11 +33,11 @@ func main() {
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
 	}))
 
-	if false {
-		e.Use(middlewares.RateLimiterMiddleware)
-	}
+	e.Use(middlewares.RateLimiterMiddleware)
 
 	db.InitDB()
+
+	cache.InitRedis()
 
 	queue.InitRabbitMQ()
 	defer queue.CloseRabbitMQ()

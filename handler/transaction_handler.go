@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"aro-shop/cache"
 	"aro-shop/db"
 	"aro-shop/models"
 	"aro-shop/queue"
@@ -12,27 +13,44 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// GetTransactions - Fetch all transactions with cache
 func GetTransactions(c echo.Context) error {
+	cacheKey := "all_transactions"
+
+	// Cek apakah ada data di cache
+	cachedData, err := cache.GetCache(cacheKey)
+	if err == nil {
+		var transactions []models.Transaction
+		if json.Unmarshal([]byte(cachedData), &transactions) == nil {
+			return utils.Response(c, http.StatusOK, "Transactions retrieved successfully (from cache)", transactions, nil, nil)
+		}
+	}
+
+	// Jika tidak ada di cache, ambil dari database
 	var transactions []models.Transaction
 	if err := db.DB.Preload("Items").Find(&transactions).Error; err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch transactions", nil, err, nil)
 	}
+
+	// Simpan hasil ke Redis selama 5 menit
+	dataJSON, _ := json.Marshal(transactions)
+	cache.SetCache(cacheKey, string(dataJSON), 5*time.Minute)
+
 	return utils.Response(c, http.StatusOK, "Transactions retrieved successfully", transactions, nil, nil)
 }
 
+// CreateTransaction - Create new transaction and invalidate cache
 func CreateTransaction(c echo.Context) error {
 	var (
 		t            models.Transaction
 		errorDetails = make(map[string]string)
 	)
 
-	// Bind request body ke struct
 	if err := c.Bind(&t); err != nil {
 		errorDetails = utils.ParseValidationErrors(err)
 		return utils.Response(c, http.StatusBadRequest, "Format permintaan tidak valid", nil, err, errorDetails)
 	}
 
-	// Validasi input
 	if err := validate.Struct(t); err != nil {
 		errorDetails = utils.ParseValidationErrors(err)
 		return utils.Response(c, http.StatusBadRequest, "Validasi gagal", nil, err, errorDetails)
@@ -43,39 +61,45 @@ func CreateTransaction(c echo.Context) error {
 		return utils.Response(c, http.StatusBadRequest, "Validasi gagal", nil, nil, errorDetails)
 	}
 
-	// Set tanggal transaksi
 	t.Date = time.Now()
 
-	// Serialize transaksi ke JSON
 	transactionJSON, err := json.Marshal(t)
 	if err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Gagal serialisasi transaksi", nil, err, nil)
 	}
 
-	// Kirim transaksi ke RabbitMQ
 	if err := queue.PublishTransaction(transactionJSON); err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Gagal mengirim transaksi ke antrian", nil, err, nil)
 	}
 
-	// Kirim notifikasi ke RabbitMQ
 	notificationMessage := "Transaksi baru telah dibuat"
 	if err := queue.PublishNotification(notificationMessage); err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Gagal mengirim notifikasi", nil, err, nil)
 	}
 
+	// Hapus cache agar data tetap fresh
+	cache.DeleteCache("all_transactions")
+
 	return utils.Response(c, http.StatusAccepted, "Transaksi berhasil dikirim ke antrian", nil, nil, nil)
 }
 
 func GetTransactionSubtotal(c echo.Context) error {
-	var (
-		transaction  models.Transaction
-		errorDetails = make(map[string]string)
-	)
-
 	transactionID := c.Param("id")
+	cacheKey := "transaction_subtotal_" + transactionID
+
+	// Cek apakah ada data di cache
+	cachedData, err := cache.GetCache(cacheKey)
+	if err == nil {
+		var result map[string]interface{}
+		if json.Unmarshal([]byte(cachedData), &result) == nil {
+			return utils.Response(c, http.StatusOK, "Transaction subtotal retrieved successfully (from cache)", result, nil, nil)
+		}
+	}
+
+	// Jika tidak ada di cache, ambil dari database
+	var transaction models.Transaction
 	if err := db.DB.Preload("Items").First(&transaction, transactionID).Error; err != nil {
-		errorDetails = utils.ParseValidationErrors(err)
-		return utils.Response(c, http.StatusNotFound, "Transaction not found", nil, err, errorDetails)
+		return utils.Response(c, http.StatusNotFound, "Transaction not found", nil, err, nil)
 	}
 
 	subtotal := 0.0
@@ -88,11 +112,14 @@ func GetTransactionSubtotal(c echo.Context) error {
 		"subtotal":       subtotal,
 	}
 
+	// Simpan hasil ke Redis selama 5 menit
+	dataJSON, _ := json.Marshal(result)
+	cache.SetCache(cacheKey, string(dataJSON), 5*time.Minute)
+
 	return utils.Response(c, http.StatusOK, "Transaction subtotal retrieved successfully", result, nil, nil)
 }
 
 func GetTransactionsByDateRange(c echo.Context) error {
-
 	var (
 		errorDetails = make(map[string]string)
 		startDate    = c.QueryParam("start")
@@ -104,12 +131,24 @@ func GetTransactionsByDateRange(c echo.Context) error {
 		return utils.Response(c, http.StatusBadRequest, "Start date and end date are required", nil, nil, errorDetails)
 	}
 
+	cacheKey := "transactions_" + startDate + "_" + endDate
+
+	cachedData, err := cache.GetCache(cacheKey)
+	if err == nil {
+		var transactions []models.Transaction
+		if json.Unmarshal([]byte(cachedData), &transactions) == nil {
+			return utils.Response(c, http.StatusOK, "Transactions retrieved successfully (from cache)", transactions, nil, nil)
+		}
+	}
+
 	var transactions []models.Transaction
 	if err := db.DB.Preload("Items").Where("date BETWEEN ? AND ?", startDate, endDate).Find(&transactions).Error; err != nil {
-		// errorDetails["query_error"] = "Gagal mengambil transaksi berdasarkan rentang tanggal"
 		errorDetails = utils.ParseValidationErrors(err)
 		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch transactions by date range", nil, err, errorDetails)
 	}
+
+	dataJSON, _ := json.Marshal(transactions)
+	cache.SetCache(cacheKey, string(dataJSON), 5*time.Minute)
 
 	return utils.Response(c, http.StatusOK, "Transactions retrieved successfully", transactions, nil, nil)
 }

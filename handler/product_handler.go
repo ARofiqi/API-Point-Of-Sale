@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"aro-shop/cache"
 	"aro-shop/db"
 	"aro-shop/models"
 	"aro-shop/utils"
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -20,13 +23,21 @@ func GetProducts(c echo.Context) error {
 		errorDetails = make(models.ErrorDetails)
 		category     = c.QueryParam("category")
 		search       = c.QueryParam("search")
-		query        = db.DB.Preload("Category")
+		cacheKey     = "products_list:" + category + ":" + search // Kunci cache unik berdasarkan kategori dan pencarian
 	)
 
+	// Cek cache di Redis
+	cachedData, err := cache.GetCache(cacheKey)
+	if err == nil {
+		json.Unmarshal([]byte(cachedData), &products)
+		return utils.Response(c, http.StatusOK, "Products fetched from cache", products, nil, nil)
+	}
+
+	// Query ke database jika tidak ada di cache
+	query := db.DB.Preload("Category")
 	if category != "" {
 		query = query.Where("category_id = ?", category)
 	}
-
 	if search != "" {
 		query = query.Where("name LIKE ?", "%"+search+"%")
 	}
@@ -36,9 +47,9 @@ func GetProducts(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch products", nil, err, errorDetails)
 	}
 
-	if len(products) == 0 {
-		return utils.Response(c, http.StatusOK, "No products found", products, nil, nil)
-	}
+	// Simpan ke Redis dengan TTL 10 menit
+	jsonData, _ := json.Marshal(products)
+	cache.SetCache(cacheKey, string(jsonData), 10*time.Minute)
 
 	return utils.Response(c, http.StatusOK, "Products fetched successfully", products, nil, nil)
 }
@@ -89,7 +100,7 @@ func UpdateProduct(c echo.Context) error {
 	if err := db.DB.First(&product, id).Error; err != nil {
 		return utils.Response(c, http.StatusNotFound, "Product not found", nil, err, nil)
 	}
-	
+
 	if err := c.Bind(&input); err != nil {
 		for _, err := range err.(validator.ValidationErrors) {
 			errorDetails[err.Field()] = "Field validation failed on the '" + err.Tag() + "' tag"
@@ -108,6 +119,9 @@ func UpdateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to update product", nil, err, nil)
 	}
 
+	// Hapus cache karena data berubah
+	cache.DeleteCache("products_list:*")
+
 	return utils.Response(c, http.StatusOK, "Product updated successfully", product, nil, nil)
 }
 
@@ -116,6 +130,9 @@ func DeleteProduct(c echo.Context) error {
 	if err := db.DB.Delete(&models.Product{}, id).Error; err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to delete product", nil, err, nil)
 	}
+
+	cache.DeleteCache("products_list:*")
+
 	return utils.Response(c, http.StatusOK, "Product deleted successfully", nil, nil, nil)
 }
 

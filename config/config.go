@@ -17,6 +17,8 @@ type Config struct {
 	RABBITMQUrl string
 	REDISHost   string
 	REDISPort   string
+	REDISPass   string
+	REDISdb     string
 	TESTMode    string
 }
 
@@ -34,6 +36,8 @@ func LoadConfig() Config {
 		RABBITMQUrl: getEnv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
 		REDISHost:   getEnv("REDIS_HOST", "redis"),
 		REDISPort:   getEnv("REDIS_PORT", "6379"),
+		REDISPass:   getEnv("REDIS_PASS", ""),
+		REDISdb:     getEnv("REDIS_DB", "0"),
 		TESTMode:    getEnv("TEST_MODE", "true"),
 	}
 	return config

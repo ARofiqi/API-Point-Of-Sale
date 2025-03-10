@@ -19,26 +19,21 @@ var (
 	notifyCloseChan   chan *amqp.Error
 )
 
-// InitRabbitMQ menginisialisasi koneksi ke RabbitMQ dan mendeklarasikan queue
 func InitRabbitMQ() {
 	var err error
 
-	// Koneksi ke RabbitMQ
 	rabbitMQConn, err = amqp.Dial(cfg.RABBITMQUrl)
 	if err != nil {
 		log.Fatalf("❌ Gagal terhubung ke RabbitMQ: %v", err)
 	}
 
-	// Buat channel
 	rabbitMQChannel, err = rabbitMQConn.Channel()
 	if err != nil {
 		log.Fatalf("❌ Gagal membuat channel: %v", err)
 	}
 
-	// Mendaftarkan channel untuk mendeteksi jika terjadi penutupan
 	notifyCloseChan = rabbitMQChannel.NotifyClose(make(chan *amqp.Error))
 
-	// Deklarasi antrian transaksi
 	_, err = rabbitMQChannel.QueueDeclare(
 		transactionQueue,
 		true,  // Durable
@@ -51,7 +46,6 @@ func InitRabbitMQ() {
 		log.Fatalf("❌ Gagal mendeklarasikan transactionQueue: %v", err)
 	}
 
-	// Deklarasi antrian notifikasi
 	_, err = rabbitMQChannel.QueueDeclare(
 		notificationQueue,
 		true,  // Durable
@@ -67,12 +61,10 @@ func InitRabbitMQ() {
 	log.Println("🚀 RabbitMQ siap digunakan!")
 }
 
-// ensureChannel memastikan channel tetap aktif sebelum digunakan
 func ensureChannel() error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	// Cek apakah channel sudah ditutup
 	select {
 	case <-notifyCloseChan:
 		log.Println("⚠️ Channel terdeteksi tertutup, membuat ulang channel...")
@@ -89,7 +81,6 @@ func ensureChannel() error {
 	return nil
 }
 
-// PublishTransaction mengirimkan pesan transaksi ke queue
 func PublishTransaction(message []byte) error {
 	if err := ensureChannel(); err != nil {
 		return err
@@ -114,7 +105,6 @@ func PublishTransaction(message []byte) error {
 	return nil
 }
 
-// PublishNotification mengirimkan notifikasi ke queue
 func PublishNotification(message string) error {
 	if err := ensureChannel(); err != nil {
 		return err
@@ -139,7 +129,6 @@ func PublishNotification(message string) error {
 	return nil
 }
 
-// CloseRabbitMQ menutup koneksi dan channel dengan aman
 func CloseRabbitMQ() {
 	closeOnce.Do(func() {
 		if rabbitMQChannel != nil {

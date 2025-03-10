@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// StartTransactionWorker memproses transaksi dari RabbitMQ
 func StartTransactionWorker() {
 	for {
 		if err := ensureChannel(); err != nil {
@@ -43,7 +42,6 @@ func StartTransactionWorker() {
 				continue
 			}
 
-			// Simpan transaksi ke database
 			if err := db.DB.Create(&t).Error; err != nil {
 				log.Println("❌ Gagal menyimpan transaksi:", err)
 				continue
@@ -54,7 +52,6 @@ func StartTransactionWorker() {
 	}
 }
 
-// StartNotificationWorker memproses notifikasi dari RabbitMQ
 func StartNotificationWorker() {
 	for {
 		if err := ensureChannel(); err != nil {
@@ -92,7 +89,6 @@ func StartNotificationWorker() {
 	}
 }
 
-// CreateNotification menyimpan notifikasi ke database
 func CreateNotification(message string) error {
 	notification := models.Notification{
 		Message:   message,
@@ -106,7 +102,6 @@ func CreateNotification(message string) error {
 	return nil
 }
 
-// StartWorker menjalankan kedua worker dalam goroutine
 func StartWorker() {
 	go StartTransactionWorker()
 	go StartNotificationWorker()
