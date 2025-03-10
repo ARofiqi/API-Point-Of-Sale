@@ -28,7 +28,7 @@ func SetupRoutes(e *echo.Echo) {
 
 	adminGroup.POST("/products", handler.CreateProduct)
 	adminGroup.PUT("/products/:id", handler.UpdateProduct)
-	adminGroup.DELETE("/products	/:id", handler.DeleteProduct)
+	adminGroup.DELETE("/products/:id", handler.DeleteProduct)
 	adminGroup.POST("/transactions", handler.CreateTransaction)
 	adminGroup.PUT("/users/:id/role", handler.SetUserRole)
 

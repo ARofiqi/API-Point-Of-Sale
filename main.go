@@ -1,19 +1,20 @@
 package main
 
 import (
+	"aro-shop/cache"
 	"aro-shop/config"
 	"aro-shop/db"
 	"aro-shop/middlewares"
 	"aro-shop/queue"
 	"aro-shop/routes"
-	"aro-shop/cache"
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 )
+
+// "net/http"
+// "github.com/labstack/echo/v4/middleware"
 
 var (
 	APPEnv = config.LoadConfig().APPEnv
@@ -28,12 +29,14 @@ func main() {
 	}
 
 	e := echo.New()
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"http://127.0.0.1:5500", "http://localhost:3000"},
-		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
-	}))
+	// e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+	// 	AllowOrigins: []string{"http://127.0.0.1:5500", "http://localhost:3000"},
+	// 	AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
+	// }))
 
-	e.Use(middlewares.RateLimiterMiddleware)
+	if false {
+		e.Use(middlewares.RateLimiterMiddleware)
+	}
 
 	db.InitDB()
 

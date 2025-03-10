@@ -54,7 +54,8 @@ func GetCache(key string) (string, error) {
 		log.Printf("❌ Gagal mengambil cache: %v", err)
 		return "", err
 	}
-	log.Printf("✅ Cache ditemukan: key=%s, value=%s", key, value)
+	// log.Printf("✅ Cache ditemukan: key=%s, value=%s", key, value)
+	log.Printf("✅ Cache ditemukan: key=%s", key)
 	return value, nil
 }
 
