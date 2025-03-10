@@ -3,7 +3,10 @@ package handler
 import (
 	"aro-shop/db"
 	"aro-shop/models"
+	"aro-shop/queue"
 	"aro-shop/utils"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -24,54 +27,41 @@ func CreateTransaction(c echo.Context) error {
 		errorDetails = make(map[string]string)
 	)
 
+	// Bind request body ke struct
 	if err := c.Bind(&t); err != nil {
 		errorDetails = utils.ParseValidationErrors(err)
 		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, errorDetails)
 	}
 
+	// Validasi input
 	if err := validate.Struct(t); err != nil {
 		errorDetails = utils.ParseValidationErrors(err)
 		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, err, errorDetails)
 	}
 
+	// Pastikan ada item di transaksi
 	if len(t.Items) == 0 {
 		errorDetails["items"] = "Transaction must contain at least one item"
 		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, nil, errorDetails)
 	}
 
+	// Tambahkan timestamp transaksi
 	t.Date = time.Now()
-	tx := db.DB.Begin()
-	if err := tx.Create(&t).Error; err != nil {
-		tx.Rollback()
-		return utils.Response(c, http.StatusInternalServerError, "Failed to create transaction", nil, err, nil)
+
+	// Serialisasi transaksi ke JSON
+	transactionJSON, err := json.Marshal(t)
+	if err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Failed to serialize transaction", nil, err, nil)
 	}
 
-	var total float64
-	for i := range t.Items {
-		var price float64
-		if err := tx.Model(&models.Product{}).Select("price").Where("id = ?", t.Items[i].ProductID).Scan(&price).Error; err != nil {
-			tx.Rollback()
-			return utils.Response(c, http.StatusNotFound, "Product not found", nil, err, nil)
+	// Kirim ke RabbitMQ menggunakan goroutine agar tidak blocking
+	go func() {
+		if err := queue.PublishTransaction(transactionJSON); err != nil {
+			fmt.Println("❌ Gagal mengirim transaksi ke queue:", err)
 		}
+	}()
 
-		t.Items[i].SubTotal = float64(t.Items[i].Quantity) * price
-		t.Items[i].TransactionID = t.ID
-		total += t.Items[i].SubTotal
-	}
-
-	if err := tx.Create(&t.Items).Error; err != nil {
-		tx.Rollback()
-		return utils.Response(c, http.StatusInternalServerError, "Failed to create transaction items", nil, err, nil)
-	}
-
-	t.Total = total
-	if err := tx.Save(&t).Error; err != nil {
-		tx.Rollback()
-		return utils.Response(c, http.StatusInternalServerError, "Failed to update transaction total", nil, err, nil)
-	}
-	tx.Commit()
-
-	return utils.Response(c, http.StatusCreated, "Transaction created successfully", t, nil, nil)
+	return utils.Response(c, http.StatusAccepted, "Transaction enqueued successfully", nil, nil, nil)
 }
 
 func GetTransactionSubtotal(c echo.Context) error {
