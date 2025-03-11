@@ -36,9 +36,9 @@ func InitDB() {
 		log.Fatal("Failed to get database instance:", err)
 	}
 
-	sqlDB.SetMaxOpenConns(25)
-	sqlDB.SetMaxIdleConns(25)
-	sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	sqlDB.SetMaxOpenConns(50)
+	sqlDB.SetMaxIdleConns(20)
+	sqlDB.SetConnMaxLifetime(10 * time.Minute)
 
 	log.Println("Connected to PostgreSQL successfully")
 }

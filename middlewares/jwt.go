@@ -3,6 +3,7 @@ package middlewares
 import (
 	"aro-shop/config"
 	"aro-shop/utils"
+	"log"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -10,14 +11,14 @@ import (
 )
 
 var (
-	cfg          = config.LoadConfig()
-	jwtSecret    = []byte(cfg.JWTSecret)
-	errorDetails = make(map[string]string)
+	cfg       = config.LoadConfig()
+	jwtSecret = []byte(cfg.JWTSecret)
 )
 
 func JWTMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
-
 	return func(c echo.Context) error {
+		errorDetails := make(map[string]string)
+
 		tokenString := c.Request().Header.Get("Authorization")
 
 		if tokenString == "" {
@@ -32,13 +33,24 @@ func JWTMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			return utils.Response(c, http.StatusUnauthorized, "Format token tidak valid", nil, nil, errorDetails)
 		}
 
+		if tokenString == "" {
+			errorDetails["jwt"] = "Token kosong setelah parsing 'Bearer '"
+			return utils.Response(c, http.StatusUnauthorized, "Token tidak valid", nil, nil, errorDetails)
+		}
+
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			return jwtSecret, nil
 		})
 
-		if err != nil || !token.Valid {
-			errorDetails["jwt"] = "Token tidak dapat diparsing atau sudah expired"
+		if err != nil {
+			log.Println("Error parsing token:", err)
+			errorDetails["jwt"] = "Gagal parsing token"
 			return utils.Response(c, http.StatusUnauthorized, "Token tidak valid atau sudah kedaluwarsa", nil, err, errorDetails)
+		}
+
+		if token == nil || !token.Valid {
+			errorDetails["jwt"] = "Token tidak valid"
+			return utils.Response(c, http.StatusUnauthorized, "Token tidak valid atau sudah kedaluwarsa", nil, nil, errorDetails)
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
@@ -47,8 +59,15 @@ func JWTMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			return utils.Response(c, http.StatusUnauthorized, "Gagal membaca klaim token", nil, nil, errorDetails)
 		}
 
+		userID, userIDExists := claims["user_id"]
+		if !userIDExists || userID == nil {
+			errorDetails["jwt"] = "User ID tidak ditemukan dalam klaim token"
+			return utils.Response(c, http.StatusUnauthorized, "User ID tidak ditemukan dalam token", nil, nil, errorDetails)
+		}
+
+		// Set data user ke context
 		c.Set("user", token)
-		c.Set("user_id", claims["user_id"])
+		c.Set("user_id", userID)
 
 		return next(c)
 	}

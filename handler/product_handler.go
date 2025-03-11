@@ -6,7 +6,9 @@ import (
 	"aro-shop/models"
 	"aro-shop/utils"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -23,17 +25,25 @@ func GetProducts(c echo.Context) error {
 		errorDetails = make(models.ErrorDetails)
 		category     = c.QueryParam("category")
 		search       = c.QueryParam("search")
-		cacheKey     = "products_list:" + category + ":" + search // Kunci cache unik berdasarkan kategori dan pencarian
+		page, _      = strconv.Atoi(c.QueryParam("page"))
+		limit, _     = strconv.Atoi(c.QueryParam("limit"))
 	)
 
-	// Cek cache di Redis
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+	cacheKey := fmt.Sprintf("products_list:%s:%s:%d:%d", category, search, page, limit)
+
 	cachedData, err := cache.GetCache(cacheKey)
 	if err == nil {
 		json.Unmarshal([]byte(cachedData), &products)
 		return utils.Response(c, http.StatusOK, "Products fetched from cache", products, nil, nil)
 	}
 
-	// Query ke database jika tidak ada di cache
 	query := db.DB.Preload("Category")
 	if category != "" {
 		query = query.Where("category_id = ?", category)
@@ -42,12 +52,11 @@ func GetProducts(c echo.Context) error {
 		query = query.Where("name LIKE ?", "%"+search+"%")
 	}
 
-	if err := query.Find(&products).Error; err != nil {
+	if err := query.Limit(limit).Offset(offset).Find(&products).Error; err != nil {
 		errorDetails["database"] = "Gagal mengambil data produk dari database"
 		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch products", nil, err, errorDetails)
 	}
 
-	// Simpan ke Redis dengan TTL 10 menit
 	jsonData, _ := json.Marshal(products)
 	cache.SetCache(cacheKey, string(jsonData), 10*time.Minute)
 
@@ -86,6 +95,8 @@ func CreateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to create product", nil, err, errorDetails)
 	}
 
+	cache.DeleteCache(fmt.Sprintf("products_list:*:*:*:*"))
+
 	return utils.Response(c, http.StatusCreated, "Product created successfully", product, nil, nil)
 }
 
@@ -120,7 +131,7 @@ func UpdateProduct(c echo.Context) error {
 	}
 
 	// Hapus cache karena data berubah
-	cache.DeleteCache("products_list:*")
+	cache.DeleteCache(fmt.Sprintf("products_list:*:*:*:*"))
 
 	return utils.Response(c, http.StatusOK, "Product updated successfully", product, nil, nil)
 }
@@ -131,7 +142,7 @@ func DeleteProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to delete product", nil, err, nil)
 	}
 
-	cache.DeleteCache("products_list:*")
+	cache.DeleteCache(fmt.Sprintf("products_list:*:*:*:*"))
 
 	return utils.Response(c, http.StatusOK, "Product deleted successfully", nil, nil, nil)
 }

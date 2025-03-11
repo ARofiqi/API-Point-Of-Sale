@@ -13,6 +13,8 @@ func RoleMiddleware(allowedRole string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			userToken := c.Get("user")
+
+			// Cek apakah token ada di context
 			if userToken == nil {
 				return utils.Response(c, http.StatusUnauthorized, "Unauthorized", nil, nil, nil)
 			}
