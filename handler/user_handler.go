@@ -19,6 +19,7 @@ var (
 	jwtSecret = []byte(cfg.JWTSecret)
 )
 
+
 func Register(c echo.Context) error {
 	var req models.RegisterRequest
 	if err := c.Bind(&req); err != nil {

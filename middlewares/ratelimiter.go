@@ -17,7 +17,7 @@ var (
 func getLimiter(ip string) *rate.Limiter {
 	limiter, exists := limiters.Load(ip)
 	if !exists {
-		newLimiter := rate.NewLimiter(rate.Limit(5), 10)
+		newLimiter := rate.NewLimiter(rate.Limit(100), 200)
 		limiters.Store(ip, newLimiter)
 
 		go func() {

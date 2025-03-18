@@ -13,11 +13,9 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// GetTransactions - Fetch all transactions with Redis cache
 func GetTransactions(c echo.Context) error {
 	cacheKey := "all_transactions"
 
-	// Cek apakah ada data di Redis cache
 	cachedData, err := cache.GetCache(cacheKey)
 	if err == nil {
 		var transactions []models.Transaction
@@ -26,20 +24,17 @@ func GetTransactions(c echo.Context) error {
 		}
 	}
 
-	// Jika tidak ada di cache, ambil dari database
 	var transactions []models.Transaction
 	if err := db.DB.Preload("Items").Find(&transactions).Error; err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch transactions", nil, err, nil)
 	}
 
-	// Simpan hasil ke Redis selama 5 menit
 	dataJSON, _ := json.Marshal(transactions)
 	cache.SetCache(cacheKey, string(dataJSON), 5*time.Minute)
 
 	return utils.Response(c, http.StatusOK, "Transactions retrieved successfully", transactions, nil, nil)
 }
 
-// CreateTransaction - Create new transaction and invalidate Redis cache
 func CreateTransaction(c echo.Context) error {
 	var (
 		t            models.Transaction
@@ -77,18 +72,15 @@ func CreateTransaction(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Gagal mengirim notifikasi", nil, err, nil)
 	}
 
-	// Hapus cache agar data tetap fresh
 	cache.DeleteCache("all_transactions")
 
 	return utils.Response(c, http.StatusAccepted, "Transaksi berhasil dikirim ke antrian", nil, nil, nil)
 }
 
-// GetTransactionSubtotal - Fetch subtotal of a transaction with Redis caching
 func GetTransactionSubtotal(c echo.Context) error {
 	transactionID := c.Param("id")
 	cacheKey := "transaction_subtotal_" + transactionID
 
-	// Cek apakah ada data di cache
 	cachedData, err := cache.GetCache(cacheKey)
 	if err == nil {
 		var result map[string]interface{}
@@ -97,7 +89,6 @@ func GetTransactionSubtotal(c echo.Context) error {
 		}
 	}
 
-	// Jika tidak ada di cache, ambil dari database
 	var transaction models.Transaction
 	if err := db.DB.Preload("Items").First(&transaction, transactionID).Error; err != nil {
 		return utils.Response(c, http.StatusNotFound, "Transaction not found", nil, err, nil)
@@ -113,14 +104,12 @@ func GetTransactionSubtotal(c echo.Context) error {
 		"subtotal":       subtotal,
 	}
 
-	// Simpan hasil ke Redis selama 5 menit
 	dataJSON, _ := json.Marshal(result)
 	cache.SetCache(cacheKey, string(dataJSON), 5*time.Minute)
 
 	return utils.Response(c, http.StatusOK, "Transaction subtotal retrieved successfully", result, nil, nil)
 }
 
-// GetTransactionsByDateRange - Fetch transactions within a date range with Redis cache
 func GetTransactionsByDateRange(c echo.Context) error {
 	var (
 		errorDetails = make(map[string]string)
@@ -135,7 +124,6 @@ func GetTransactionsByDateRange(c echo.Context) error {
 
 	cacheKey := "transactions_" + startDate + "_" + endDate
 
-	// Cek apakah ada data di cache
 	cachedData, err := cache.GetCache(cacheKey)
 	if err == nil {
 		var transactions []models.Transaction
@@ -150,9 +138,9 @@ func GetTransactionsByDateRange(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch transactions by date range", nil, err, errorDetails)
 	}
 
-	// Simpan hasil ke Redis selama 5 menit
 	dataJSON, _ := json.Marshal(transactions)
 	cache.SetCache(cacheKey, string(dataJSON), 5*time.Minute)
 
 	return utils.Response(c, http.StatusOK, "Transactions retrieved successfully", transactions, nil, nil)
 }
+

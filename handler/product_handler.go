@@ -19,6 +19,12 @@ var (
 	validate = validator.New()
 )
 
+func resetRedish() {
+	cache.DeleteCache("products_list:*:*:*:*")
+	cache.DeleteCache("product:*")
+	cache.DeleteCache("categories_with_products")
+}
+
 func GetProducts(c echo.Context) error {
 	var (
 		products     []models.Product
@@ -27,6 +33,7 @@ func GetProducts(c echo.Context) error {
 		search       = c.QueryParam("search")
 		page, _      = strconv.Atoi(c.QueryParam("page"))
 		limit, _     = strconv.Atoi(c.QueryParam("limit"))
+		cacheKey     = fmt.Sprintf("products_list:%s:%s:%d:%d", category, search, page, limit)
 	)
 
 	if page < 1 {
@@ -36,14 +43,16 @@ func GetProducts(c echo.Context) error {
 		limit = 10
 	}
 	offset := (page - 1) * limit
-	cacheKey := fmt.Sprintf("products_list:%s:%s:%d:%d", category, search, page, limit)
 
+	// 1️⃣ Cek apakah data ada di Redis
 	cachedData, err := cache.GetCache(cacheKey)
 	if err == nil {
-		json.Unmarshal([]byte(cachedData), &products)
-		return utils.Response(c, http.StatusOK, "Products fetched from cache", products, nil, nil)
+		var cachedProducts []models.ProductResponse
+		json.Unmarshal([]byte(cachedData), &cachedProducts)
+		return utils.Response(c, http.StatusOK, "Products fetched from cache", cachedProducts, nil, nil)
 	}
 
+	// 2️⃣ Jika tidak ada di Redis, ambil dari database
 	query := db.DB.Preload("Category")
 	if category != "" {
 		query = query.Where("category_id = ?", category)
@@ -57,10 +66,78 @@ func GetProducts(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch products", nil, err, errorDetails)
 	}
 
-	jsonData, _ := json.Marshal(products)
+	// 3️⃣ Konversi ke format response yang diinginkan
+	var productResponses []models.ProductResponse
+	for _, product := range products {
+		productResponses = append(productResponses, models.ProductResponse{
+			ID:       product.ID,
+			Name:     product.Name,
+			Price:    product.Price,
+			Category: product.Category.Name,
+		})
+	}
+
+	// 4️⃣ Simpan hasil query ke Redis untuk cache selama 10 menit
+	jsonData, _ := json.Marshal(productResponses)
 	cache.SetCache(cacheKey, string(jsonData), 10*time.Minute)
 
-	return utils.Response(c, http.StatusOK, "Products fetched successfully", products, nil, nil)
+	return utils.Response(c, http.StatusOK, "Products fetched successfully", productResponses, nil, nil)
+}
+
+func GetProductByID(c echo.Context) error {
+	var (
+		id       = c.Param("id")
+		product  models.Product
+		cacheKey = fmt.Sprintf("product:%s", id)
+	)
+
+	// 1️⃣ Cek apakah data ada di Redis
+	cachedData, err := cache.GetCache(cacheKey)
+	if err == nil {
+		var cachedProduct models.ProductResponse
+		if json.Unmarshal([]byte(cachedData), &cachedProduct) == nil {
+			return utils.Response(c, http.StatusOK, "Product fetched from cache", cachedProduct, nil, nil)
+		}
+	}
+
+	// 2️⃣ Jika tidak ada di Redis, ambil dari database
+	if err := db.DB.Preload("Category").First(&product, id).Error; err != nil {
+		return utils.Response(c, http.StatusNotFound, "Product not found", nil, err, nil)
+	}
+
+	// 3️⃣ Konversi ke format response yang diinginkan
+	productResponse := models.ConvertToProductResponse(product)
+
+	// 4️⃣ Simpan hasil query ke Redis untuk cache selama 10 menit
+	jsonData, _ := json.Marshal(productResponse)
+	cache.SetCache(cacheKey, string(jsonData), 10*time.Minute)
+
+	return utils.Response(c, http.StatusOK, "Product fetched successfully", productResponse, nil, nil)
+}
+
+func GetCategoriesWithProducts(c echo.Context) error {
+	var (
+		categories []models.Category
+		cacheKey   = "categories_with_products"
+	)
+
+	// 1️⃣ Cek apakah data ada di Redis
+	cachedData, err := cache.GetCache(cacheKey)
+	if err == nil {
+		json.Unmarshal([]byte(cachedData), &categories)
+		return utils.Response(c, http.StatusOK, "Categories fetched from cache", categories, nil, nil)
+	}
+
+	// 2️⃣ Jika tidak ada di Redis, ambil dari database
+	if err := db.DB.Preload("Products").Find(&categories).Error; err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch categories", nil, err, nil)
+	}
+
+	// 3️⃣ Simpan ke Redis dengan TTL 10 menit
+	jsonData, _ := json.Marshal(categories)
+	cache.SetCache(cacheKey, string(jsonData), 10*time.Minute)
+
+	return utils.Response(c, http.StatusOK, "Categories fetched successfully", categories, nil, nil)
 }
 
 func CreateProduct(c echo.Context) error {
@@ -95,7 +172,7 @@ func CreateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to create product", nil, err, errorDetails)
 	}
 
-	cache.DeleteCache(fmt.Sprintf("products_list:*:*:*:*"))
+	resetRedish()
 
 	return utils.Response(c, http.StatusCreated, "Product created successfully", product, nil, nil)
 }
@@ -130,8 +207,7 @@ func UpdateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to update product", nil, err, nil)
 	}
 
-	// Hapus cache karena data berubah
-	cache.DeleteCache(fmt.Sprintf("products_list:*:*:*:*"))
+	resetRedish()
 
 	return utils.Response(c, http.StatusOK, "Product updated successfully", product, nil, nil)
 }
@@ -142,27 +218,7 @@ func DeleteProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to delete product", nil, err, nil)
 	}
 
-	cache.DeleteCache(fmt.Sprintf("products_list:*:*:*:*"))
+	resetRedish()
 
 	return utils.Response(c, http.StatusOK, "Product deleted successfully", nil, nil, nil)
-}
-
-func GetProductByID(c echo.Context) error {
-	id := c.Param("id")
-	var product models.Product
-
-	if err := db.DB.Preload("Category").First(&product, id).Error; err != nil {
-		return utils.Response(c, http.StatusNoContent, "Product not found", nil, err, nil)
-	}
-
-	return utils.Response(c, http.StatusOK, "Product fetched successfully", product, nil, nil)
-}
-
-func GetCategoriesWithProducts(c echo.Context) error {
-	var categories []models.Category
-	if err := db.DB.Preload("Products").Find(&categories).Error; err != nil {
-		return utils.Response(c, http.StatusInternalServerError, "Failed to fetch categories", nil, err, nil)
-	}
-
-	return utils.Response(c, http.StatusOK, "Categories with products fetched successfully", categories, nil, nil)
 }
