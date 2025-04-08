@@ -190,22 +190,29 @@ func GetCategoriesWithProducts(c echo.Context) error {
 func CreateProduct(c echo.Context) error {
 	var (
 		category     models.Category
+		req          models.ProductRequest
 		product      models.Product
 		errorDetails = make(models.ErrorDetails)
 	)
 
-	if err := c.Bind(&product); err != nil {
+	if err := c.Bind(&req); err != nil {
 		for _, err := range err.(validator.ValidationErrors) {
 			errorDetails[err.Field()] = "Field validation failed on the '" + err.Tag() + "' tag"
 		}
 		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, errorDetails)
 	}
 
-	if err := validate.Struct(product); err != nil {
+	if err := validate.Struct(req); err != nil {
 		for _, err := range err.(validator.ValidationErrors) {
 			errorDetails[err.Field()] = "Field validation failed on the '" + err.Tag() + "' tag"
 		}
 		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, err, errorDetails)
+	}
+
+	product = models.Product{
+		Name:       req.Name,
+		Price:      req.Price,
+		CategoryID: req.CategoryID,
 	}
 
 	if err := db.DB.First(&category, product.CategoryID).Error; err != nil {
@@ -218,9 +225,17 @@ func CreateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to create product", nil, err, errorDetails)
 	}
 
+	if err := db.DB.Preload("Category").First(&product, product.ID).Error; err != nil {
+		errorDetails["database"] = err.Error()
+		return utils.Response(c, http.StatusInternalServerError, "Failed to load product with category", nil, err, errorDetails)
+	}
+
+	// Konversi ke format response yang diinginkan
+	var productResponses models.ProductResponse = models.ConvertToProductResponse(product)
+
 	go cache.ResetRedisCache(cachedDataProducts...)
 
-	return utils.Response(c, http.StatusCreated, "Product created successfully", product, nil, nil)
+	return utils.Response(c, http.StatusCreated, "Product created successfully", productResponses, nil, nil)
 }
 
 func UpdateProduct(c echo.Context) error {
@@ -256,9 +271,16 @@ func UpdateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Internal server error", nil, err, errorDetails)
 	}
 
+	if err := db.DB.Preload("Category").First(&product, product.ID).Error; err != nil {
+		errorDetails["database"] = err.Error()
+		return utils.Response(c, http.StatusInternalServerError, "Failed to load product with category", nil, err, errorDetails)
+	}
+
+	var productResponses models.ProductResponse = models.ConvertToProductResponse(product)
+
 	go cache.ResetRedisCache(cachedDataProducts...)
 
-	return utils.Response(c, http.StatusOK, "Product updated successfully", product, nil, nil)
+	return utils.Response(c, http.StatusOK, "Product updated successfully", productResponses, nil, nil)
 }
 
 func DeleteProduct(c echo.Context) error {

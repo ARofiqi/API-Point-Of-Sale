@@ -15,7 +15,7 @@ func SetupRoutes(e *echo.Echo) {
 	superAdminGroup.Use(middlewares.JWTMiddleware, middlewares.RoleMiddleware("superAdmin"))
 	superAdminGroup.POST("/api/auth/register/admin", handler.RegisterAdmin)
 
-	// e.POST("/api/init-superadmin", handler.RegisterAdmin)	
+	// e.POST("/api/init-superadmin", handler.RegisterAdmin)
 
 	authGroup := e.Group("/api")
 	authGroup.Use(middlewares.JWTMiddleware)
@@ -36,10 +36,12 @@ func SetupRoutes(e *echo.Echo) {
 	authGroup.GET("/categories", handler.GetCategories)
 	authGroup.GET("/categories/:id", handler.GetCategoriesById)
 
+	authGroup.GET("/paymentMethods", handler.GetPaymentMethods)
+	authGroup.GET("/paymentMethods/:id", handler.GetPaymentMethod)
+	authGroup.POST("/paymentMethods", handler.CreatePaymentMethod)
+
 	adminGroup := e.Group("/api")
 	adminGroup.Use(middlewares.JWTMiddleware, middlewares.RoleMiddleware("admin"))
-
-	adminGroup.PUT("/users/:id/role", handler.SetUserRole)
 
 	adminGroup.POST("/product", handler.CreateProduct)
 	adminGroup.PUT("/product/:id", handler.UpdateProduct)
@@ -48,4 +50,7 @@ func SetupRoutes(e *echo.Echo) {
 	adminGroup.POST("/categories", handler.CreateCategory)
 	adminGroup.PUT("/categories/:id", handler.UpdateCategory)
 	adminGroup.DELETE("/categories/:id", handler.DeleteCategory)
+
+	adminGroup.PUT("/paymentMethods/:id", handler.UpdatePaymentMethod)
+	adminGroup.DELETE("/paymentMethods/:id", handler.DeletePaymentMethod)
 }

@@ -6,7 +6,7 @@ import (
 
 type PaymentMethod struct {
 	ID   uint   `json:"id" gorm:"primaryKey"`
-	Name string `json:"name" gorm:"type:varchar(50);not null;unique"`
+	Name string `json:"name" validate:"required" gorm:"unique;type:varchar(50);not null;unique"`
 }
 
 type Payment struct {

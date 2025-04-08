@@ -13,6 +13,8 @@ func Migrate() {
 	err := DB.AutoMigrate(
 		&models.User{},
 		&models.Product{},
+		&models.PaymentMethod{},
+		&models.Payment{},
 		&models.TransactionItem{},
 		&models.Transaction{},
 		&models.Category{},

@@ -46,7 +46,10 @@ func main() {
 
 	go queue.StartWorker()
 
-	seeder.CreateSuperAdminIfNotExists()
+	if len(os.Args) > 1 && os.Args[1] == "seeder" {
+		seeder.CreateSuperAdminIfNotExists()
+		seeder.SeedPaymentMethods()
+	}
 
 	routes.SetupRoutes(e)
 	e.Start(":8080")
