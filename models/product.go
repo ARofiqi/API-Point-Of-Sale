@@ -5,9 +5,8 @@ import (
 )
 
 type Category struct {
-	ID       uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name     string    `json:"name" gorm:"type:varchar(255);not null"`
-	Products []Product `json:"products,omitempty" gorm:"foreignKey:CategoryID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ID   uint   `json:"id" gorm:"primaryKey;autoIncrement"`
+	Name string `json:"name" gorm:"type:varchar(255);not null"`
 }
 
 type Product struct {

@@ -8,8 +8,8 @@ import (
 )
 
 func SetupRoutes(e *echo.Echo) {
-	e.POST("/register", handler.Register)
-	e.POST("/login", handler.Login)
+	e.POST("/api/auth/register", handler.Register)
+	e.POST("/api/auth/login", handler.Login)
 
 	authGroup := e.Group("/api")
 	authGroup.Use(middlewares.JWTMiddleware)
@@ -19,15 +19,16 @@ func SetupRoutes(e *echo.Echo) {
 	authGroup.GET("/category-products", handler.GetCategoriesWithProducts)
 
 	authGroup.GET("/transactions", handler.GetTransactions)
-	authGroup.POST("/transaction", handler.CreateTransaction)
 	authGroup.GET("/transactions/date", handler.GetTransactionsByDateRange)
 	authGroup.GET("/transactions/:id/subtotal", handler.GetTransactionSubtotal)
+	authGroup.POST("/transaction", handler.CreateTransaction)
 
 	authGroup.GET("/notifications", handler.GetNotifications)
+	authGroup.GET("/notification/:id", handler.GetNotificationById)
 	authGroup.PUT("/notification/:id/read", handler.MarkNotificationAsRead)
 
 	authGroup.GET("/categories", handler.GetCategories)
-	authGroup.GET("/categories/:id", handler.GetCategory)
+	authGroup.GET("/categories/:id", handler.GetCategoriesById)
 
 	adminGroup := e.Group("/api")
 	adminGroup.Use(middlewares.JWTMiddleware, middlewares.RoleMiddleware("admin"))

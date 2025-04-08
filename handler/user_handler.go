@@ -19,7 +19,6 @@ var (
 	jwtSecret = []byte(cfg.JWTSecret)
 )
 
-
 func Register(c echo.Context) error {
 	var req models.RegisterRequest
 	if err := c.Bind(&req); err != nil {
@@ -83,6 +82,7 @@ func Login(c echo.Context) error {
 		"role":    user.Role,
 		"exp":     time.Now().Add(time.Hour * 24).Unix(),
 	})
+
 	tokenString, err := token.SignedString(jwtSecret)
 	if err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to generate token", nil, err, nil)
@@ -94,6 +94,7 @@ func Login(c echo.Context) error {
 
 func SetUserRole(c echo.Context) error {
 	userID := c.Param("id")
+
 	var req struct {
 		Role models.Role `json:"role" validate:"required,oneof=user admin"`
 	}

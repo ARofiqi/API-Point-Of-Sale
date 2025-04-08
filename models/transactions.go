@@ -10,14 +10,14 @@ type PaymentMethod struct {
 }
 
 type Payment struct {
-	ID              uint           `json:"id" gorm:"primaryKey"`
-	TransactionID   uint           `json:"transaction_id" gorm:"unique;not null"`
-	Transaction     *Transaction   `json:"transaction" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	PaymentMethodID uint           `json:"payment_method_id" gorm:"not null"`
-	PaymentMethod   PaymentMethod  `json:"payment_method" gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
-	AmountPaid      float64        `json:"amount_paid" gorm:"type:numeric(10,2);not null"`
-	PaymentStatus   string         `json:"payment_status" gorm:"type:varchar(20);not null;default:'pending'"`
-	PaidAt          *time.Time     `json:"paid_at"`
+	ID              uint          `json:"id" gorm:"primaryKey"`
+	TransactionID   uint          `json:"transaction_id" gorm:"unique;not null"`
+	Transaction     *Transaction  `json:"transaction" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	PaymentMethodID uint          `json:"payment_method_id" gorm:"not null"`
+	PaymentMethod   PaymentMethod `json:"payment_method" gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
+	AmountPaid      float64       `json:"amount_paid" gorm:"type:numeric(10,2);not null"`
+	PaymentStatus   string        `json:"payment_status" gorm:"type:varchar(20);not null;default:'pending'"`
+	PaidAt          *time.Time    `json:"paid_at"`
 }
 
 type Transaction struct {

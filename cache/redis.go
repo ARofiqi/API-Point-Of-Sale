@@ -3,8 +3,10 @@ package cache
 import (
 	"aro-shop/config"
 	"context"
+	"fmt"
 	"log"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -61,4 +63,28 @@ func GetCache(key string) (string, error) {
 
 func DeleteCache(key string) error {
 	return RedisClient.Del(ctx, key).Err()
+}
+
+func DeleteCacheByPattern(pattern string) error {
+	iter := RedisClient.Scan(ctx, 0, pattern, 0).Iterator()
+	for iter.Next(ctx) {
+		RedisClient.Del(ctx, iter.Val())
+	}
+	return iter.Err()
+}
+
+func ResetRedisCache(patterns ...string) {
+	var wg sync.WaitGroup
+
+	wg.Add(len(patterns))
+
+	for _, pattern := range patterns {
+		go func(p string) {
+			defer wg.Done()
+			DeleteCacheByPattern(p)
+		}(pattern)
+	}
+
+	wg.Wait() // Tunggu semua goroutine selesai sebelum mencetak pesan sukses
+	fmt.Println("✅ Berhasil menghapus cache")
 }
