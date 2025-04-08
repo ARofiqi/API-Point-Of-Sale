@@ -11,6 +11,12 @@ func SetupRoutes(e *echo.Echo) {
 	e.POST("/api/auth/register", handler.Register)
 	e.POST("/api/auth/login", handler.Login)
 
+	superAdminGroup := e.Group("")
+	superAdminGroup.Use(middlewares.JWTMiddleware, middlewares.RoleMiddleware("superAdmin"))
+	superAdminGroup.POST("/api/auth/register/admin", handler.RegisterAdmin)
+
+	// e.POST("/api/init-superadmin", handler.RegisterAdmin)	
+
 	authGroup := e.Group("/api")
 	authGroup.Use(middlewares.JWTMiddleware)
 

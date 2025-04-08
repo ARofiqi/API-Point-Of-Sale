@@ -7,6 +7,7 @@ import (
 	"aro-shop/middlewares"
 	"aro-shop/queue"
 	"aro-shop/routes"
+	"aro-shop/seeder"
 	"fmt"
 	"os"
 
@@ -44,6 +45,8 @@ func main() {
 	defer queue.CloseRabbitMQ()
 
 	go queue.StartWorker()
+
+	seeder.CreateSuperAdminIfNotExists()
 
 	routes.SetupRoutes(e)
 	e.Start(":8080")
