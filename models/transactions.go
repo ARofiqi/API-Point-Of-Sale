@@ -2,35 +2,29 @@ package models
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
-type PaymentMethod struct {
-	ID   uint   `json:"id" gorm:"primaryKey"`
-	Name string `json:"name" validate:"required" gorm:"unique;type:varchar(50);not null;unique"`
-}
-
-type Payment struct {
-	ID              uint          `json:"id" gorm:"primaryKey"`
-	TransactionID   uint          `json:"transaction_id" gorm:"unique;not null"`
-	Transaction     *Transaction  `json:"transaction" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	PaymentMethodID uint          `json:"payment_method_id" gorm:"not null"`
-	PaymentMethod   PaymentMethod `json:"payment_method" gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
-	AmountPaid      float64       `json:"amount_paid" gorm:"type:numeric(10,2);not null"`
-	PaymentStatus   string        `json:"payment_status" gorm:"type:varchar(20);not null;default:'pending'"`
-	PaidAt          *time.Time    `json:"paid_at"`
-}
-
 type Transaction struct {
-	ID    uint              `json:"id" gorm:"primaryKey"`
-	Date  time.Time         `json:"date" gorm:"autoCreateTime"`
-	Total float64           `json:"total" gorm:"type:numeric(10,2);not null"`
-	Items []TransactionItem `json:"items" gorm:"foreignKey:TransactionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ID         uuid.UUID         `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	UserID     uuid.UUID         `json:"user_id" gorm:"type:uuid;not null"`
+	User       User              `json:"user" gorm:"foreignKey:UserID;references:ID"`
+	Date       time.Time         `json:"date" gorm:"autoCreateTime"`
+	// AmountPaid float64           `json:"amount_paid" gorm:"type:numeric(10,2);not null"`
+	Items      []TransactionItem `json:"items" gorm:"foreignKey:TransactionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Payment    *Payment          `json:"payment,omitempty" gorm:"foreignKey:TransactionID"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
 }
 
 type TransactionItem struct {
-	ID            uint    `json:"id" gorm:"primaryKey"`
-	TransactionID uint    `json:"transaction_id" gorm:"index;not null"`
-	ProductID     uint    `json:"product_id" validate:"required" gorm:"not null"`
-	Quantity      int     `json:"quantity" validate:"required,min=1" gorm:"not null"`
-	SubTotal      float64 `json:"sub_total" gorm:"type:numeric(10,2);not null"`
+	ID            uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	TransactionID uuid.UUID `json:"transaction_id" gorm:"type:uuid;not null"`
+	ProductID     uuid.UUID `json:"product_id" gorm:"type:uuid;not null"`
+	Product       Product   `json:"product" gorm:"foreignKey:ProductID"`
+	Quantity      int       `json:"quantity" gorm:"not null"`
+	SubTotal      float64   `json:"subtotal" gorm:"type:numeric(10,2);not null"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }

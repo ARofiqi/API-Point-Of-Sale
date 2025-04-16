@@ -1,12 +1,12 @@
 package utils
 
 import (
-	"aro-shop/models"
+	"aro-shop/dto"
 
 	"github.com/labstack/echo/v4"
 )
 
-func Response(c echo.Context, statusCode int, message string, data interface{}, err error, errorDetails map[string]string) error {
+func Response(c echo.Context, statusCode int, message string, data interface{}, err error, errorDetails dto.ErrorDetails) error {
 	var errorID string
 
 	// if errorDetails != nil && len(errorDetails) > 0 {
@@ -19,7 +19,7 @@ func Response(c echo.Context, statusCode int, message string, data interface{}, 
 		LogError(c, errorID, message, err)
 	}
 
-	return c.JSON(statusCode, models.Response{
+	return c.JSON(statusCode, dto.Response{
 		Message: message,
 		Data:    data,
 		Errors:  errorDetails,

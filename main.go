@@ -51,6 +51,10 @@ func main() {
 		seeder.SeedPaymentMethods()
 	}
 
+	if len(os.Args) > 1 && os.Args[1] == "reset" {
+		db.ResetDB()
+	}
+
 	routes.SetupRoutes(e)
 	e.Start(":8080")
 }

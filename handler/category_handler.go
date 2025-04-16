@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -50,9 +51,15 @@ func GetCategoriesById(c echo.Context) error {
 		}
 	}
 
-	// Fetch dari database jika cache tidak tersedia
+	// pengecekan id
 	var category models.Category
-	if err := db.DB.First(&category, id).Error; err != nil {
+	uuidID, err := uuid.Parse(id)
+	if err != nil {
+		return utils.Response(c, http.StatusBadRequest, "Invalid UUID format", nil, err, nil)
+	}
+
+	// Fetch dari database jika cache tidak tersedia
+	if err := db.DB.First(&category, "id = ?", uuidID).Error; err != nil {
 		return utils.Response(c, http.StatusNotFound, "Category not found", nil, err, nil)
 	}
 
@@ -78,21 +85,31 @@ func CreateCategory(c echo.Context) error {
 	}
 
 	// Hapus cache kategori agar data terbaru bisa diambil
-	cache.DeleteCache("categories")
+	go cache.ResetRedisCache("categories")
 
 	return utils.Response(c, http.StatusCreated, "Category created successfully", category, nil, nil)
 }
 
 func UpdateCategory(c echo.Context) error {
 	id := c.Param("id")
+
+	// lakukan pengecekan id
+	uuidID, err := uuid.Parse(id)
+	if err != nil {
+		return utils.Response(c, http.StatusBadRequest, "Invalid UUID format", nil, err, nil)
+	}
+
+	// ambil data kategori
 	var existingCategory models.Category
-	if err := db.DB.First(&existingCategory, id).Error; err != nil {
+	if err := db.DB.First(&existingCategory, "id = ?", uuidID).Error; err != nil {
 		return utils.Response(c, http.StatusNotFound, "Category not found", nil, err, nil)
 	}
 
 	var updateData struct {
 		Name string `json:"name"`
 	}
+
+	// bind data
 	if err := c.Bind(&updateData); err != nil {
 		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, nil)
 	}
@@ -103,11 +120,13 @@ func UpdateCategory(c echo.Context) error {
 
 	existingCategory.Name = updateData.Name
 
+	// simpan data
 	if err := db.DB.Save(&existingCategory).Error; err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to update category", nil, err, nil)
 	}
 
-	cache.DeleteCache("categories")
+	// Hapus cache kategori terkait agar data terbaru bisa diambil
+	go cache.ResetRedisCache("categories")
 
 	return utils.Response(c, http.StatusOK, "Category updated successfully", existingCategory, nil, nil)
 }
@@ -115,12 +134,17 @@ func UpdateCategory(c echo.Context) error {
 func DeleteCategory(c echo.Context) error {
 	id := c.Param("id")
 
-	if err := db.DB.Delete(&models.Category{}, id).Error; err != nil {
+	uuidID, err := uuid.Parse(id)
+	if err != nil {
+		return utils.Response(c, http.StatusBadRequest, "Invalid UUID format", nil, err, nil)
+	}
+
+	if err := db.DB.Delete(&models.Category{}, "id = ?", uuidID).Error; err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to delete category", nil, err, nil)
 	}
 
 	// Hapus cache kategori terkait agar data terbaru bisa diambil
-	cache.DeleteCache("categories")
+	go cache.ResetRedisCache("categories")
 
 	return utils.Response(c, http.StatusOK, "Category deleted successfully", nil, nil, nil)
 }

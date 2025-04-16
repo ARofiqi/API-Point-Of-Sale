@@ -2,10 +2,12 @@ package seeder
 
 import (
 	"log"
+	"time"
 
 	"aro-shop/db"
 	"aro-shop/models"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -76,6 +78,29 @@ func SeedPaymentMethods() error {
 			} else {
 				return err
 			}
+		}
+	}
+
+	return nil
+}
+
+func SeedCategories() error {
+	categories := []models.Category{
+		{ID: uuid.New(), Name: "Technology", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: uuid.New(), Name: "Health", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: uuid.New(), Name: "Education", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: uuid.New(), Name: "Finance", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: uuid.New(), Name: "Entertainment", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: uuid.New(), Name: "Travel", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: uuid.New(), Name: "Food & Beverage", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: uuid.New(), Name: "Lifestyle", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: uuid.New(), Name: "Business", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: uuid.New(), Name: "Sports", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+	}
+
+	for _, category := range categories {
+		if err := db.DB.Create(&category).Error; err != nil {
+			return err
 		}
 	}
 

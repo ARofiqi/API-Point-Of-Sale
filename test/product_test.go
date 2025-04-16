@@ -52,7 +52,7 @@ func TestCreateProduct(t *testing.T) {
 	product := models.Product{
 		Name:       "Test Product",
 		Price:      10000,
-		CategoryID: 1,
+		CategoryID: uuid.UUID{},
 	}
 	jsonBody, _ := json.Marshal(product)
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewBuffer(jsonBody))

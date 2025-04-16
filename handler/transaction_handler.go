@@ -3,17 +3,21 @@ package handler
 import (
 	"aro-shop/cache"
 	"aro-shop/db"
+	"aro-shop/dto"
 	"aro-shop/models"
 	"aro-shop/queue"
 	"aro-shop/utils"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"gorm.io/gorm"
 )
 
 var (
@@ -24,7 +28,7 @@ var (
 
 func GetTransactions(c echo.Context) error {
 	cacheKeyPrefix := "transactions_page_"
-	errorDetails := make(models.ErrorDetails)
+	errorDetails := make(dto.ErrorDetails)
 
 	// Ambil parameter page dan limit dari query string
 	page, err := strconv.Atoi(c.QueryParam("page"))
@@ -178,42 +182,148 @@ func GetTransactionsByDateRange(c echo.Context) error {
 
 func CreateTransaction(c echo.Context) error {
 	var (
-		t            models.Transaction
+		req          dto.TransactionRequest
 		errorDetails = make(map[string]string)
 	)
 
-	if err := c.Bind(&t); err != nil {
-		// errorDetails = utils.ParseValidationErrors(err)
-		return utils.Response(c, http.StatusBadRequest, "Format permintaan tidak valid", nil, err, errorDetails)
+	// Bind request ke struct DTO
+	if err := c.Bind(&req); err != nil {
+		return utils.Response(c, http.StatusBadRequest, "Format permintaan tidak valid", nil, err, nil)
 	}
 
-	if err := validate.Struct(t); err != nil {
+	// Validasi menggunakan validator
+	if err := validate.Struct(req); err != nil {
 		errorDetails = utils.ParseValidationErrors(err)
 		return utils.Response(c, http.StatusBadRequest, "Validasi gagal", nil, err, errorDetails)
 	}
 
-	if len(t.Items) == 0 {
+	// Validasi item produk
+	if len(req.Items) == 0 {
 		errorDetails["items"] = "Transaksi harus memiliki setidaknya satu item"
 		return utils.Response(c, http.StatusBadRequest, "Validasi gagal", nil, nil, errorDetails)
 	}
 
-	t.Date = time.Now()
+	var total float64
+	var transactionItems []models.TransactionItem
 
-	transactionJSON, err := json.Marshal(t)
+	for _, item := range req.Items {
+		var product models.Product
+		if err := db.DB.Where("id = ?", item.ProductID).First(&product).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				errorDetails["product_id"] = fmt.Sprintf("Produk dengan ID %v tidak ditemukan", item.ProductID)
+				return utils.Response(c, http.StatusBadRequest, "Produk tidak valid", nil, nil, errorDetails)
+			}
+			return utils.Response(c, http.StatusInternalServerError, "Gagal memeriksa produk", nil, err, nil)
+		}
+
+		subTotal := product.Price * float64(item.Quantity)
+		total += subTotal
+
+		transactionItems = append(transactionItems, models.TransactionItem{
+			ProductID: item.ProductID,
+			Quantity:  item.Quantity,
+			SubTotal:  subTotal,
+		})
+	}
+
+	userID := c.Get("user_id")
+
+	strID, ok := userID.(string)
+	if !ok {
+		return utils.Response(c, http.StatusUnauthorized, "User ID tidak valid", nil, nil, nil)
+	}
+
+	uid, err := uuid.Parse(strID)
+	if err != nil || uid == uuid.Nil {
+		return utils.Response(c, http.StatusUnauthorized, "User UUID tidak valid", nil, nil, nil)
+	}
+
+	transaction := models.Transaction{
+		UserID:     uid,
+		Date:       time.Now(),
+		AmountPaid: total,
+	}
+
+	// Simpan transaksi terlebih dahulu untuk mendapatkan ID
+	if err := db.DB.Create(&transaction).Error; err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Gagal menyimpan transaksi", nil, err, nil)
+	}
+
+	// Set TransactionID untuk setiap item
+	for i := range transactionItems {
+		transactionItems[i].TransactionID = transaction.ID
+	}
+
+	// Simpan semua item ke database
+	if err := db.DB.Create(&transactionItems).Error; err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Gagal menyimpan item transaksi", nil, err, nil)
+	}
+
+	// Buat entitas pembayaran
+	payment := models.Payment{
+		TransactionID:   transaction.ID,
+		PaymentMethodID: req.PaymentMethodID,
+		PaymentStatus:   "pending",
+	}
+
+	if err := db.DB.Create(&payment).Error; err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Gagal menyimpan pembayaran", nil, err, nil)
+	}
+
+	// (Optional) Gabungkan transaksi dan payment untuk dikirim ke queue
+	transaction.Payment = &payment
+
+	if err := db.DB.
+		Preload("User").
+		Preload("Items").
+		Preload("Items.Product").
+		Preload("Payment").
+		Preload("Payment.PaymentMethod").
+		First(&transaction, "id = ?", transaction.ID).Error; err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Gagal mengambil data transaksi lengkap", nil, err, nil)
+	}
+
+	transactionJSON, err := json.Marshal(transaction)
 	if err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Gagal serialisasi transaksi", nil, err, nil)
 	}
 
+	// Kirim ke antrian
 	if err := queue.PublishTransaction(transactionJSON); err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Gagal mengirim transaksi ke antrian", nil, err, nil)
 	}
 
-	notificationMessage := "Transaksi baru telah dibuat"
-	if err := queue.PublishNotification(notificationMessage); err != nil {
+	// Kirim notifikasi
+	if err := queue.PublishNotification("Transaksi baru telah dibuat"); err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Gagal mengirim notifikasi", nil, err, nil)
 	}
 
+	// Reset Redis cache
 	go cache.ResetRedisCache(cachedDataTransactions...)
 
-	return utils.Response(c, http.StatusAccepted, "Transaksi berhasil dikirim ke antrian", nil, nil, nil)
+	TransactionResponse := dto.TransactionResponse{
+		ID:         transaction.ID,
+		User:       dto.SimpleUserResponse{ID: transaction.User.ID, Name: transaction.User.Name, Email: transaction.User.Email},
+		Date:       transaction.Date,
+		Items:      MapTransactionItemToResponse(transaction.Items),
+		Payment:    &dto.PaymentResponse{ID: payment.ID},
+		CreatedAt:  transaction.CreatedAt,
+		UpdatedAt:  transaction.UpdatedAt,
+	}
+
+	return utils.Response(c, http.StatusCreated, "Transaksi berhasil dibuat", TransactionResponse, nil, nil)
+}
+
+func MapTransactionItemToResponse(items []models.TransactionItem) []dto.TransactionItemResponse {
+	var response []dto.TransactionItemResponse
+	for _, item := range items {
+		response = append(response, dto.TransactionItemResponse{
+			ID:          item.ID,
+			ProductID:   item.ProductID,
+			ProductName: item.Product.Name,
+			Quantity:    item.Quantity,
+			SubTotal:    item.SubTotal,
+		})
+	}
+	return response
 }

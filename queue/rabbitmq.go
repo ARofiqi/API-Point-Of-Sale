@@ -4,6 +4,7 @@ import (
 	"aro-shop/config"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/streadway/amqp"
 )
@@ -83,19 +84,23 @@ func ensureChannel() error {
 
 func PublishTransaction(message []byte) error {
 	if err := ensureChannel(); err != nil {
+		log.Printf("❌ Gagal memastikan channel RabbitMQ: %v", err)
 		return err
 	}
 
 	err := rabbitMQChannel.Publish(
-		"",               // Exchange
-		transactionQueue, // Routing Key
-		false,            // Mandatory
-		false,            // Immediate
+		"",               // exchange
+		transactionQueue, // routing key (queue name)
+		false,            // mandatory
+		false,            // immediate
 		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        message,
+			ContentType:  "application/json",
+			Body:         message,
+			DeliveryMode: amqp.Persistent, // buat pesan tetap jika server down
+			Timestamp:    time.Now(),      // tambahkan timestamp
 		},
 	)
+
 	if err != nil {
 		log.Printf("❌ Gagal mengirim transaksi ke queue: %v", err)
 		return err

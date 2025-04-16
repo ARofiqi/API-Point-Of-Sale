@@ -34,20 +34,20 @@ func StartTransactionWorker() {
 		}
 
 		log.Println("👷 Worker transaksi berjalan...")
-
+		
 		for msg := range msgs {
-			var t models.Transaction
-			if err := json.Unmarshal(msg.Body, &t); err != nil {
+			var transaction models.Transaction
+			if err := json.Unmarshal(msg.Body, &transaction); err != nil {
 				log.Println("❌ Gagal parsing transaksi:", err)
 				continue
 			}
 
-			if err := db.DB.Create(&t).Error; err != nil {
+			if err := db.DB.Create(&transaction).Error; err != nil {
 				log.Println("❌ Gagal menyimpan transaksi:", err)
 				continue
 			}
 
-			log.Println("✅ Transaksi berhasil disimpan ke database:", t.ID)
+			log.Println("✅ Transaksi berhasil disimpan ke database:", transaction.ID)
 		}
 	}
 }

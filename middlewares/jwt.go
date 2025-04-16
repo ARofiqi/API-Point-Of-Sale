@@ -3,6 +3,7 @@ package middlewares
 import (
 	"aro-shop/config"
 	"aro-shop/utils"
+	"aro-shop/dto"
 	"log"
 	"net/http"
 
@@ -17,7 +18,7 @@ var (
 
 func JWTMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		errorDetails := make(map[string]string)
+		errorDetails := make(dto.ErrorDetails)
 
 		tokenString := c.Request().Header.Get("Authorization")
 

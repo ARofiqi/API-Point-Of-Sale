@@ -14,9 +14,9 @@ func Migrate() {
 		&models.User{},
 		&models.Product{},
 		&models.PaymentMethod{},
-		&models.Payment{},
-		&models.TransactionItem{},
 		&models.Transaction{},
+		&models.TransactionItem{},
+		&models.Payment{},
 		&models.Category{},
 		&models.Notification{},
 	)

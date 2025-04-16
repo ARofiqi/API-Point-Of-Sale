@@ -3,6 +3,7 @@ package handler
 import (
 	"aro-shop/cache"
 	"aro-shop/db"
+	"aro-shop/dto"
 	"aro-shop/models"
 	"aro-shop/utils"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -27,7 +29,7 @@ var (
 func GetProducts(c echo.Context) error {
 	var (
 		products     []models.Product
-		errorDetails = make(models.ErrorDetails)
+		errorDetails = make(dto.ErrorDetails)
 		category     = c.QueryParam("category")
 		search       = c.QueryParam("search")
 		page, _      = strconv.Atoi(c.QueryParam("page"))
@@ -43,15 +45,15 @@ func GetProducts(c echo.Context) error {
 	}
 	offset := (page - 1) * limit
 
-	// 1️⃣ Cek apakah data ada di Redis
+	// Cek apakah data ada di Redis
 	cachedData, err := cache.GetCache(cacheKey)
 	if err == nil {
-		var cachedProducts []models.ProductResponse
+		var cachedProducts []dto.ProductResponse
 		json.Unmarshal([]byte(cachedData), &cachedProducts)
 		return utils.Response(c, http.StatusOK, "Products fetched from cache", cachedProducts, nil, nil)
 	}
 
-	// 2️⃣ Jika tidak ada di Redis, ambil dari database
+	// Jika tidak ada di Redis, ambil dari database
 	query := db.DB.Preload("Category")
 	if category != "" {
 		query = query.Where("category_id = ?", category)
@@ -65,13 +67,15 @@ func GetProducts(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Internal server error", nil, err, errorDetails)
 	}
 
-	// 3️⃣ Konversi ke format response yang diinginkan
-	var productResponses []models.ProductResponse
-	for _, product := range products {
-		productResponses = append(productResponses, models.ConvertToProductResponse(product))
+	// Konversi ke format response yang diinginkan
+	var productResponses []dto.ProductResponse
+	if len(products) > 0 {
+		for _, product := range products {
+			productResponses = append(productResponses, dto.ConvertToProductResponse(product))
+		}
 	}
 
-	// 4️⃣ Simpan hasil query ke Redis untuk cache selama 10 menit
+	// Simpan hasil query ke Redis untuk cache selama 10 menit
 	jsonData, _ := json.Marshal(productResponses)
 	cache.SetCache(cacheKey, string(jsonData), 10*time.Minute)
 
@@ -83,28 +87,35 @@ func GetProductByID(c echo.Context) error {
 		id           = c.Param("id")
 		product      models.Product
 		cacheKey     = fmt.Sprintf("product:%s", id)
-		errorDetails = make(models.ErrorDetails)
+		errorDetails = make(dto.ErrorDetails)
 	)
 
-	// 1️⃣ Cek apakah data ada di Redis
+	// Cek apakah data ada di Redis
 	cachedData, err := cache.GetCache(cacheKey)
 	if err == nil {
-		var cachedProduct models.ProductResponse
+		var cachedProduct dto.ProductResponse
 		if json.Unmarshal([]byte(cachedData), &cachedProduct) == nil {
 			return utils.Response(c, http.StatusOK, "Product fetched from cache", cachedProduct, nil, nil)
 		}
 	}
 
-	// 2️⃣ Jika tidak ada di Redis, ambil dari database
-	if err := db.DB.Preload("Category").First(&product, id).Error; err != nil {
+	// lakukan pengecekan id
+	uuidID, err := uuid.Parse(id)
+	if err != nil {
+		errorDetails["id"] = "Invalid UUID format"
+		return utils.Response(c, http.StatusBadRequest, "Invalid ID format", nil, err, errorDetails)
+	}
+
+	// Jika tidak ada di Redis, ambil dari database
+	if err := db.DB.Preload("Category").First(&product, "id = ?", uuidID).Error; err != nil {
 		errorDetails["id"] = "Product not found"
 		return utils.Response(c, http.StatusNotFound, "Client error", nil, err, errorDetails)
 	}
 
-	// 3️⃣ Konversi ke format response yang diinginkan
-	productResponse := models.ConvertToProductResponse(product)
+	// Konversi ke format response yang diinginkan
+	productResponse := dto.ConvertToProductResponse(product)
 
-	// 4️⃣ Simpan hasil query ke Redis untuk cache selama 10 menit
+	// Simpan hasil query ke Redis untuk cache selama 10 menit
 	jsonData, _ := json.Marshal(productResponse)
 	cache.SetCache(cacheKey, string(jsonData), 10*time.Minute)
 
@@ -115,7 +126,7 @@ func GetCategoriesWithProducts(c echo.Context) error {
 	var (
 		products    []models.Product
 		cacheKey    = "categories_with_products"
-		categoryMap = make(map[string][]models.ProductResponse)
+		categoryMap = make(map[string][]dto.ProductResponse)
 	)
 
 	// Ambil query parameter `page` dan `limit`, default `page=1` dan `limit=5`
@@ -145,7 +156,7 @@ func GetCategoriesWithProducts(c echo.Context) error {
 	// Kelompokkan produk berdasarkan kategori
 	for _, product := range products {
 		categoryName := product.Category.Name
-		categoryMap[categoryName] = append(categoryMap[categoryName], models.ConvertToProductResponse(product))
+		categoryMap[categoryName] = append(categoryMap[categoryName], dto.ConvertToProductResponse(product))
 	}
 
 	// Format hasil sesuai output yang diinginkan
@@ -190,21 +201,21 @@ func GetCategoriesWithProducts(c echo.Context) error {
 func CreateProduct(c echo.Context) error {
 	var (
 		category     models.Category
-		req          models.ProductRequest
+		req          dto.ProductRequest
 		product      models.Product
-		errorDetails = make(models.ErrorDetails)
+		errorDetails = make(dto.ErrorDetails)
 	)
 
 	if err := c.Bind(&req); err != nil {
-		for _, err := range err.(validator.ValidationErrors) {
-			errorDetails[err.Field()] = "Field validation failed on the '" + err.Tag() + "' tag"
-		}
-		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, errorDetails)
+		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, nil)
 	}
 
 	if err := validate.Struct(req); err != nil {
-		for _, err := range err.(validator.ValidationErrors) {
-			errorDetails[err.Field()] = "Field validation failed on the '" + err.Tag() + "' tag"
+		errorDetails := make(map[string]string)
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			for _, e := range validationErrors {
+				errorDetails[e.Field()] = "Field validation failed on the '" + e.Tag() + "' tag"
+			}
 		}
 		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, err, errorDetails)
 	}
@@ -231,7 +242,7 @@ func CreateProduct(c echo.Context) error {
 	}
 
 	// Konversi ke format response yang diinginkan
-	var productResponses models.ProductResponse = models.ConvertToProductResponse(product)
+	var productResponses dto.ProductResponse = dto.ConvertToProductResponse(product)
 
 	go cache.ResetRedisCache(cachedDataProducts...)
 
@@ -240,13 +251,19 @@ func CreateProduct(c echo.Context) error {
 
 func UpdateProduct(c echo.Context) error {
 	var (
-		errorDetails = make(models.ErrorDetails)
+		errorDetails = make(dto.ErrorDetails)
 		product      models.Product
 		input        models.Product
 		id           = c.Param("id")
 	)
 
-	if err := db.DB.First(&product, id).Error; err != nil {
+	uuidID, err := uuid.Parse(id)
+	if err != nil {
+		errorDetails["id"] = "Invalid UUID format"
+		return utils.Response(c, http.StatusBadRequest, "Invalid ID format", nil, err, errorDetails)
+	}
+
+	if err := db.DB.First(&product, "id = ?", uuidID).Error; err != nil {
 		errorDetails["id"] = "Product not found"
 		return utils.Response(c, http.StatusNotFound, "Client error", nil, err, errorDetails)
 	}
@@ -258,7 +275,7 @@ func UpdateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, errorDetails)
 	}
 
-	if input.CategoryID != 0 {
+	if input.CategoryID != uuid.Nil {
 		var category models.Category
 		if err := db.DB.First(&category, input.CategoryID).Error; err != nil {
 			errorDetails["category"] = "Category not found"
@@ -276,7 +293,7 @@ func UpdateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to load product with category", nil, err, errorDetails)
 	}
 
-	var productResponses models.ProductResponse = models.ConvertToProductResponse(product)
+	var productResponses dto.ProductResponse = dto.ConvertToProductResponse(product)
 
 	go cache.ResetRedisCache(cachedDataProducts...)
 
@@ -286,13 +303,23 @@ func UpdateProduct(c echo.Context) error {
 func DeleteProduct(c echo.Context) error {
 	var (
 		id          = c.Param("id")
-		errorDetail = make(models.ErrorDetails)
+		errorDetail = make(dto.ErrorDetails)
 	)
-	if err := db.DB.Delete(&models.Product{}, id).Error; err != nil {
+
+	// melakukan pengecekan id = uuid
+	uuidID, err := uuid.Parse(id)
+	if err != nil {
+		errorDetail["id"] = "Invalid UUID format"
+		return utils.Response(c, http.StatusBadRequest, "Invalid ID format", nil, err, errorDetail)
+	}
+
+	// mencari data di database
+	if err := db.DB.Delete(&models.Product{}, "id = ?", uuidID).Error; err != nil {
 		errorDetail["database"] = "Failed to delete product"
 		return utils.Response(c, http.StatusInternalServerError, "Internal server error", nil, err, errorDetail)
 	}
 
+	// reset redis agar terjadi konsistensi data
 	go cache.ResetRedisCache(cachedDataProducts...)
 
 	return utils.Response(c, http.StatusOK, "Product deleted successfully", nil, nil, nil)

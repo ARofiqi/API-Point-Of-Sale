@@ -3,6 +3,7 @@ package handler
 import (
 	"aro-shop/config"
 	"aro-shop/db"
+	"aro-shop/dto"
 	"aro-shop/models"
 	"aro-shop/utils"
 	"errors"
@@ -21,15 +22,8 @@ var (
 	jwtSecret = []byte(cfg.JWTSecret)
 )
 
-type RegisterRequest struct {
-	Name            string `json:"name" validate:"required,min=3,max=100"`
-	Email           string `json:"email" validate:"required,email"`
-	Password        string `json:"password" validate:"required,min=6"`
-	ConfirmPassword string `json:"ConfirmPassword" validate:"required,min=6"`
-}
-
 func Register(c echo.Context) error {
-	var req RegisterRequest
+	var req dto.RegisterRequest
 	if err := c.Bind(&req); err != nil {
 		return utils.Response(c, http.StatusBadRequest, "Invalid request", nil, err, nil)
 	}
@@ -42,6 +36,7 @@ func Register(c echo.Context) error {
 	if req.Password != req.ConfirmPassword {
 		return utils.Response(c, http.StatusBadRequest, "Password and Confirm Password do not match", nil, nil, nil)
 	}
+
 	var existingUser models.User
 	if err := db.DB.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
 		return utils.Response(c, http.StatusBadRequest, "Email is already registered", nil, nil, nil)
@@ -65,17 +60,17 @@ func Register(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to register user", nil, err, nil)
 	}
 
-	data := map[string]interface{}{
-		"id":    user.ID,
-		"name":  user.Name,
-		"email": user.Email,
+	data := dto.RegisterResponse{
+		ID:    user.ID,
+		Name:  user.Name,
+		Email: user.Email,
 	}
 
 	return utils.Response(c, http.StatusCreated, "User registered successfully", data, nil, nil)
 }
 
 func RegisterAdmin(c echo.Context) error {
-	var req RegisterRequest
+	var req dto.RegisterRequest
 	if err := c.Bind(&req); err != nil {
 		return utils.Response(c, http.StatusBadRequest, "Invalid request", nil, err, nil)
 	}
@@ -88,6 +83,7 @@ func RegisterAdmin(c echo.Context) error {
 	if req.Password != req.ConfirmPassword {
 		return utils.Response(c, http.StatusBadRequest, "Password and Confirm Password do not match", nil, nil, nil)
 	}
+
 	var existingUser models.User
 	if err := db.DB.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
 		return utils.Response(c, http.StatusBadRequest, "Email is already registered", nil, nil, nil)
@@ -111,17 +107,17 @@ func RegisterAdmin(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to register user", nil, err, nil)
 	}
 
-	data := map[string]interface{}{
-		"id":    user.ID,
-		"name":  user.Name,
-		"email": user.Email,
+	data := dto.RegisterResponse{
+		ID:    user.ID,
+		Name:  user.Name,
+		Email: user.Email,
 	}
 
 	return utils.Response(c, http.StatusCreated, "User registered successfully", data, nil, nil)
 }
 
 func Login(c echo.Context) error {
-	var req models.LoginRequest
+	var req dto.LoginRequest
 	if err := c.Bind(&req); err != nil {
 		return utils.Response(c, http.StatusBadRequest, "Invalid request", nil, err, nil)
 	}
@@ -155,27 +151,4 @@ func Login(c echo.Context) error {
 
 	data := map[string]string{"token": tokenString}
 	return utils.Response(c, http.StatusOK, "Login successful", data, nil, nil)
-}
-
-func SetUserRole(c echo.Context) error {
-	userID := c.Param("id")
-
-	var req struct {
-		Role models.Role `json:"role" validate:"required,oneof=user admin"`
-	}
-
-	if err := c.Bind(&req); err != nil {
-		return utils.Response(c, http.StatusBadRequest, "Invalid request", nil, err, nil)
-	}
-
-	if err := validate.Struct(req); err != nil {
-		errorDetails := utils.ParseValidationErrors(err)
-		return utils.Response(c, http.StatusBadRequest, "Validation error", nil, err, errorDetails)
-	}
-
-	if err := db.DB.Model(&models.User{}).Where("id = ?", userID).Update("role", req.Role).Error; err != nil {
-		return utils.Response(c, http.StatusInternalServerError, "Failed to update role", nil, err, nil)
-	}
-
-	return utils.Response(c, http.StatusOK, "User role updated successfully", nil, nil, nil)
 }
