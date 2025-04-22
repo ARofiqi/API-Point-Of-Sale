@@ -17,3 +17,9 @@ type RegisterResponse struct {
 	Name  string      `json:"name"`
 	Email string      `json:"email"`
 }
+
+type ChangePasswordRequest struct {
+	OldPassword     string `json:"old_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required,min=6"`
+	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=NewPassword"`
+}

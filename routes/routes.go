@@ -20,6 +20,8 @@ func SetupRoutes(e *echo.Echo) {
 	authGroup := e.Group("/api")
 	authGroup.Use(middlewares.JWTMiddleware)
 
+	authGroup.POST("/auth/change-password", handler.ChangePassword)
+
 	authGroup.GET("/products", handler.GetProducts)
 	authGroup.GET("/product/:id", handler.GetProductByID)
 	authGroup.GET("/category-products", handler.GetCategoriesWithProducts)

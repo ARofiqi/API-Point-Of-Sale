@@ -9,7 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -150,4 +150,42 @@ func Login(c echo.Context) error {
 
 	data := map[string]string{"token": tokenString}
 	return utils.Response(c, http.StatusOK, "Login successful", data, nil, nil)
+}
+
+func ChangePassword(c echo.Context) error {
+	userID := c.Get("user_id")
+	if userID == nil {
+		return utils.Response(c, http.StatusUnauthorized, "Unauthorized", nil, nil, nil)
+	}
+
+	var req dto.ChangePasswordRequest
+	if err := c.Bind(&req); err != nil {
+		return utils.Response(c, http.StatusBadRequest, "Invalid request", nil, err, nil)
+	}
+
+	if err := validate.Struct(req); err != nil {
+		errorDetails := utils.ParseValidationErrors(err)
+		return utils.Response(c, http.StatusBadRequest, "Validation error", nil, err, errorDetails)
+	}
+
+	var user models.User
+	if err := db.DB.Where("id = ?", userID).First(&user).Error; err != nil {
+		return utils.Response(c, http.StatusNotFound, "User not found", nil, err, nil)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
+		return utils.Response(c, http.StatusBadRequest, "Old password is incorrect", nil, err, nil)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Error hashing new password", nil, err, nil)
+	}
+
+	user.Password = string(hashedPassword)
+	if err := db.DB.Save(&user).Error; err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Failed to update password", nil, err, nil)
+	}
+
+	return utils.Response(c, http.StatusOK, "Password updated successfully", nil, nil, nil)
 }
