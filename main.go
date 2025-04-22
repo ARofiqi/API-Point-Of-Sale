@@ -26,7 +26,6 @@ func main() {
 		fmt.Println("Running database migrations...")
 		db.Migrate()
 		fmt.Println("Migration completed!")
-		return
 	}
 
 	e := echo.New()
@@ -36,6 +35,7 @@ func main() {
 	// }))
 
 	e.Use(middlewares.RateLimiterMiddleware)
+	e.Static("/public", "public")
 
 	db.InitDB()
 

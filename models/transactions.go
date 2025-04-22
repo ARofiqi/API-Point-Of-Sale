@@ -11,9 +11,9 @@ type Transaction struct {
 	UserID     uuid.UUID         `json:"user_id" gorm:"type:uuid;not null"`
 	User       User              `json:"user" gorm:"foreignKey:UserID;references:ID"`
 	Date       time.Time         `json:"date" gorm:"autoCreateTime"`
-	// AmountPaid float64           `json:"amount_paid" gorm:"type:numeric(10,2);not null"`
+	AmountPaid float64           `json:"amount_paid" gorm:"type:numeric(10,2);not null"`
 	Items      []TransactionItem `json:"items" gorm:"foreignKey:TransactionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Payment    *Payment          `json:"payment,omitempty" gorm:"foreignKey:TransactionID"`
+	Payment    *Payment           `json:"payment,omitempty" gorm:"foreignKey:TransactionID;references:ID"`
 	CreatedAt  time.Time         `json:"created_at"`
 	UpdatedAt  time.Time         `json:"updated_at"`
 }

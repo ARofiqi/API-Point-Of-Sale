@@ -9,31 +9,37 @@ import (
 )
 
 type ProductResponse struct {
-	ID        uuid.UUID       `json:"id"`
-	Name      string          `json:"name"`
-	Price     float64         `json:"price"`
-	Stock     int             `json:"stock"`
-	Category  models.Category `json:"category"`
-	CreatedAt time.Time       `json:"created_at"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	ID          uuid.UUID       `json:"id"`
+	Name        string          `json:"name"`
+	Price       float64         `json:"price"`
+	Description string          `json:"description"`
+	Stock       int             `json:"stock"`
+	URLImage    string          `json:"url_image"`
+	Category    models.Category `json:"category"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 type ProductRequest struct {
-	Name       string    `json:"name" validate:"required"`
-	Price      float64   `json:"price" validate:"required,gt=0"`
-	CategoryID uuid.UUID `json:"category_id" validate:"required"`
-	Stock      int       `json:"stock" validate:"required,gte=0"`
+	Name        string    `json:"name" validate:"required"`
+	Price       float64   `json:"price" validate:"required,gt=0"`
+	Description string    `json:"description"`
+	Stock       int       `json:"stock" validate:"required,gte=0"`
+	URLImage    string    `json:"url_image"`
+	CategoryID  uuid.UUID `json:"category_id" validate:"required"`
 }
 
 func ConvertToProductResponse(product models.Product) ProductResponse {
 	return ProductResponse{
-		ID:        product.ID,
-		Name:      product.Name,
-		Price:     product.Price,
-		Stock:     product.Stock,
-		Category:  product.Category,
-		CreatedAt: product.CreatedAt,
-		UpdatedAt: product.UpdatedAt,
+		ID:          product.ID,
+		Name:        product.Name,
+		Description: product.Description,
+		Price:       product.Price,
+		Stock:       product.Stock,
+		URLImage:    product.URLImage,
+		Category:    product.Category,
+		CreatedAt:   product.CreatedAt,
+		UpdatedAt:   product.UpdatedAt,
 	}
 }
 

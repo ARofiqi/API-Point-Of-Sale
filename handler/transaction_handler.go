@@ -61,18 +61,29 @@ func GetTransactions(c echo.Context) error {
 
 	// Jika tidak ada di Redis, ambil dari database dengan pagination
 	var transactions []models.Transaction
-	if err := db.DB.Preload("Items").Limit(limit).Offset(offset).Find(&transactions).Error; err != nil {
+	if err := db.DB.
+		Preload("User").
+		Preload("Items").
+		Preload("Items.Product").
+		Preload("Payment").
+		Preload("Payment.PaymentMethod").
+		Limit(limit).
+		Offset(offset).
+		Find(&transactions).Error; err != nil {
 		errorDetails["database"] = "Failed to fetch transactions"
 		return utils.Response(c, http.StatusInternalServerError, "Internal server error", nil, err, errorDetails)
 	}
 
+	// Map to DTO response
+	transactionResponses := MapTransactionsToResponse(transactions)
+
 	// Simpan hasil query ke Redis
-	dataJSON, _ := json.Marshal(transactions)
+	dataJSON, _ := json.Marshal(transactionResponses)
 	cache.SetCache(cacheKey, string(dataJSON), 10*time.Minute)
 
 	// Struktur respons dengan pagination
 	response := map[string]interface{}{
-		"transactions": transactions,
+		"transactions": transactionResponses,
 		"pagination": map[string]interface{}{
 			"current_page": page,
 			"per_page":     limit,
@@ -84,20 +95,95 @@ func GetTransactions(c echo.Context) error {
 	return utils.Response(c, http.StatusOK, "Transactions retrieved successfully", response, nil, nil)
 }
 
+func GetTransactionsById(c echo.Context) error {
+	cacheKeyPrefix := "transactions_"
+	errorDetails := make(dto.ErrorDetails)
+
+	// Ambil parameter id dari URL params
+	id := c.Param("id")
+
+	// Validasi format UUID (opsional tapi direkomendasikan)
+	_, err := uuid.Parse(id)
+	if err != nil {
+		return utils.Response(c, http.StatusBadRequest, "Invalid UUID format", nil, nil, nil)
+	}
+
+	cacheKey := fmt.Sprintf("%s%s", cacheKeyPrefix, id)
+
+	// Cek apakah data ada di Redis
+	cachedData, err := cache.GetCache(cacheKey)
+	if err == nil {
+		var transactions []models.Transaction
+		if json.Unmarshal([]byte(cachedData), &transactions) == nil {
+			return utils.Response(c, http.StatusOK, "Transactions retrieved successfully (from cache)", transactions, nil, nil)
+		}
+	}
+
+	// Ambil total data untuk indexing
+	var total int64
+	if err := db.DB.Model(&models.Transaction{}).Count(&total).Error; err != nil {
+		errorDetails["database"] = "Failed to count transactions"
+		return utils.Response(c, http.StatusInternalServerError, "Internal server error", nil, err, errorDetails)
+	}
+
+	// Jika tidak ada di Redis, ambil dari database dengan pagination
+	var transaction models.Transaction
+	if err := db.DB.
+		Preload("User").
+		Preload("Items").
+		Preload("Items.Product").
+		Preload("Payment").
+		Preload("Payment.PaymentMethod").
+		Find(&transaction).Error; err != nil {
+		errorDetails["database"] = "Failed to fetch transactions"
+		return utils.Response(c, http.StatusInternalServerError, "Internal server error", nil, err, errorDetails)
+	}
+
+	TransactionResponse := dto.TransactionResponse{
+		ID:         transaction.ID,
+		User:       dto.SimpleUserResponse{ID: transaction.User.ID, Name: transaction.User.Name, Email: transaction.User.Email},
+		Date:       transaction.Date,
+		AmountPaid: transaction.AmountPaid,
+		Items:      MapTransactionItemToResponse(transaction.Items),
+		Payment: &dto.PaymentResponse{
+			ID:            transaction.Payment.ID,
+			Status:        transaction.Payment.PaymentStatus,
+			PaymentMethod: &dto.PaymentMethodSimple{ID: transaction.Payment.PaymentMethod.ID, Name: transaction.Payment.PaymentMethod.Name},
+			PaidAt:        transaction.Payment.PaidAt,
+			AmountPaid:    transaction.Payment.AmountPaid,
+			CreatedAt:     transaction.Payment.CreatedAt,
+			UpdatedAt:     transaction.Payment.UpdatedAt,
+		},
+		CreatedAt: transaction.CreatedAt,
+		UpdatedAt: transaction.UpdatedAt,
+	}
+
+	// Simpan hasil query ke Redis
+	dataJSON, _ := json.Marshal(TransactionResponse)
+	cache.SetCache(cacheKey, string(dataJSON), 10*time.Minute)
+
+	return utils.Response(c, http.StatusOK, "Transactions retrieved successfully", TransactionResponse, nil, nil)
+}
+
 func GetTransactionSubtotal(c echo.Context) error {
 	transactionID := c.Param("id")
 	cacheKey := "transaction_subtotal_" + transactionID
 
-	cachedData, err := cache.GetCache(cacheKey)
-	if err == nil {
-		var result map[string]interface{}
-		if json.Unmarshal([]byte(cachedData), &result) == nil {
-			return utils.Response(c, http.StatusOK, "Transaction subtotal retrieved successfully (from cache)", result, nil, nil)
-		}
+	// cachedData, err := cache.GetCache(cacheKey)
+	// if err == nil {
+	// 	var result map[string]interface{}
+	// 	if json.Unmarshal([]byte(cachedData), &result) == nil {
+	// 		return utils.Response(c, http.StatusOK, "Transaction subtotal retrieved successfully (from cache)", result, nil, nil)
+	// 	}
+	// }
+
+	// Validasi UUID terlebih dahulu
+	if _, err := uuid.Parse(transactionID); err != nil {
+		return utils.Response(c, http.StatusBadRequest, "Invalid transaction ID format", nil, err, nil)
 	}
 
 	var transaction models.Transaction
-	if err := db.DB.Preload("Items").First(&transaction, transactionID).Error; err != nil {
+	if err := db.DB.Preload("Items").Where("id = ?", transactionID).First(&transaction).Error; err != nil {
 		return utils.Response(c, http.StatusNotFound, "Transaction not found", nil, err, nil)
 	}
 
@@ -264,14 +350,12 @@ func CreateTransaction(c echo.Context) error {
 		TransactionID:   transaction.ID,
 		PaymentMethodID: req.PaymentMethodID,
 		PaymentStatus:   "pending",
+		PaidAt:          nil,
 	}
 
 	if err := db.DB.Create(&payment).Error; err != nil {
 		return utils.Response(c, http.StatusInternalServerError, "Gagal menyimpan pembayaran", nil, err, nil)
 	}
-
-	// (Optional) Gabungkan transaksi dan payment untuk dikirim ke queue
-	transaction.Payment = &payment
 
 	if err := db.DB.
 		Preload("User").
@@ -283,15 +367,14 @@ func CreateTransaction(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Gagal mengambil data transaksi lengkap", nil, err, nil)
 	}
 
-	transactionJSON, err := json.Marshal(transaction)
-	if err != nil {
-		return utils.Response(c, http.StatusInternalServerError, "Gagal serialisasi transaksi", nil, err, nil)
-	}
-
 	// Kirim ke antrian
-	if err := queue.PublishTransaction(transactionJSON); err != nil {
-		return utils.Response(c, http.StatusInternalServerError, "Gagal mengirim transaksi ke antrian", nil, err, nil)
-	}
+	// transactionJSON, err := json.Marshal(transaction)
+	// if err != nil {
+	// 	return utils.Response(c, http.StatusInternalServerError, "Gagal serialisasi transaksi", nil, err, nil)
+	// }
+	// if err := queue.PublishTransaction(transactionJSON); err != nil {
+	// 	return utils.Response(c, http.StatusInternalServerError, "Gagal mengirim transaksi ke antrian", nil, err, nil)
+	// }
 
 	// Kirim notifikasi
 	if err := queue.PublishNotification("Transaksi baru telah dibuat"); err != nil {
@@ -305,13 +388,89 @@ func CreateTransaction(c echo.Context) error {
 		ID:         transaction.ID,
 		User:       dto.SimpleUserResponse{ID: transaction.User.ID, Name: transaction.User.Name, Email: transaction.User.Email},
 		Date:       transaction.Date,
+		AmountPaid: transaction.AmountPaid,
 		Items:      MapTransactionItemToResponse(transaction.Items),
-		Payment:    &dto.PaymentResponse{ID: payment.ID},
-		CreatedAt:  transaction.CreatedAt,
-		UpdatedAt:  transaction.UpdatedAt,
+		Payment: &dto.PaymentResponse{
+			ID:            transaction.Payment.ID,
+			Status:        transaction.Payment.PaymentStatus,
+			PaymentMethod: &dto.PaymentMethodSimple{ID: transaction.Payment.PaymentMethod.ID, Name: transaction.Payment.PaymentMethod.Name},
+			PaidAt:        transaction.Payment.PaidAt,
+			AmountPaid:    transaction.Payment.AmountPaid,
+			CreatedAt:     transaction.Payment.CreatedAt,
+			UpdatedAt:     transaction.Payment.UpdatedAt,
+		},
+		CreatedAt: transaction.CreatedAt,
+		UpdatedAt: transaction.UpdatedAt,
 	}
 
 	return utils.Response(c, http.StatusCreated, "Transaksi berhasil dibuat", TransactionResponse, nil, nil)
+}
+
+func UpdateTransaction(c echo.Context) error {
+	transactionID := c.Param("id")
+	var transaction models.Transaction
+
+	// Ambil data transaksi dari DB beserta relasinya
+	if err := db.DB.Preload("Items").Preload("Payment").First(&transaction, "id = ?", transactionID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.Response(c, http.StatusNotFound, "Transaksi tidak ditemukan", nil, nil, nil)
+		}
+		return utils.Response(c, http.StatusInternalServerError, "Gagal mengambil transaksi", nil, err, nil)
+	}
+
+	// Cek jika sudah dibayar
+	if transaction.Payment.PaymentStatus == "paid" {
+		return utils.Response(c, http.StatusBadRequest, "Transaksi sudah dibayar", nil, nil, nil)
+	}
+
+	now := time.Now()
+
+	// Update status pembayaran
+	if err := db.DB.Model(&transaction.Payment).Updates(models.Payment{
+		PaymentStatus: "paid",
+		PaidAt:        &now,
+		AmountPaid:    transaction.AmountPaid,
+	}).Error; err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Gagal memperbarui pembayaran", nil, err, nil)
+	}
+
+	// Kurangi stok produk
+	for _, item := range transaction.Items {
+		if err := db.DB.Model(&models.Product{}).
+			Where("id = ? AND stock >= ?", item.ProductID, item.Quantity).
+			Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+			return utils.Response(c, http.StatusInternalServerError, "Gagal mengurangi stok produk", nil, err, nil)
+		}
+	}
+
+	// Ambil ulang data lengkap
+	if err := db.DB.
+		Preload("User").
+		Preload("Items").
+		Preload("Items.Product").
+		Preload("Payment").
+		Preload("Payment.PaymentMethod").
+		First(&transaction, "id = ?", transaction.ID).Error; err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Gagal mengambil data transaksi lengkap", nil, err, nil)
+	}
+
+	// Response
+	TransactionResponse := dto.TransactionResponse{
+		ID:         transaction.ID,
+		Payment: &dto.PaymentResponse{
+			ID:            transaction.Payment.ID,
+			Status:        transaction.Payment.PaymentStatus,
+			PaymentMethod: &dto.PaymentMethodSimple{ID: transaction.Payment.PaymentMethod.ID, Name: transaction.Payment.PaymentMethod.Name},
+			PaidAt:        transaction.Payment.PaidAt,
+			AmountPaid:    transaction.Payment.AmountPaid,
+			CreatedAt:     transaction.Payment.CreatedAt,
+			UpdatedAt:     transaction.Payment.UpdatedAt,
+		},
+		CreatedAt: transaction.CreatedAt,
+		UpdatedAt: transaction.UpdatedAt,
+	}
+
+	return utils.Response(c, http.StatusOK, "Transaksi berhasil diperbarui dan dibayar", TransactionResponse, nil, nil)
 }
 
 func MapTransactionItemToResponse(items []models.TransactionItem) []dto.TransactionItemResponse {
@@ -326,4 +485,33 @@ func MapTransactionItemToResponse(items []models.TransactionItem) []dto.Transact
 		})
 	}
 	return response
+}
+
+func MapTransactionsToResponse(transactions []models.Transaction) []dto.TransactionResponse {
+	var responses []dto.TransactionResponse
+	for _, transaction := range transactions {
+		res := dto.TransactionResponse{
+			ID:         transaction.ID,
+			User:       dto.SimpleUserResponse{ID: transaction.User.ID, Name: transaction.User.Name, Email: transaction.User.Email},
+			Date:       transaction.Date,
+			AmountPaid: transaction.AmountPaid,
+			// Items:      MapTransactionItemToResponse(transaction.Items),
+			Payment: &dto.PaymentResponse{
+				ID:            transaction.Payment.ID,
+				Status:        transaction.Payment.PaymentStatus,
+				PaymentMethod: &dto.PaymentMethodSimple{
+					ID: transaction.Payment.PaymentMethod.ID, 
+					Name: transaction.Payment.PaymentMethod.Name,
+				},
+				PaidAt:        transaction.Payment.PaidAt,
+				AmountPaid:    transaction.Payment.AmountPaid,
+				CreatedAt:     transaction.Payment.CreatedAt,
+				UpdatedAt:     transaction.Payment.UpdatedAt,
+			},
+			CreatedAt: transaction.CreatedAt,
+			UpdatedAt: transaction.UpdatedAt,
+		}
+		responses = append(responses, res)
+	}
+	return responses
 }

@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	APPEnv      string
+	BaseURL     string
 	DBHost      string
 	DBPort      string
 	DBUser      string
@@ -27,6 +28,7 @@ func LoadConfig() Config {
 
 	config := Config{
 		APPEnv:      getEnv("APP_ENV", "development"),
+		BaseURL:     getEnv("BASE_URL", "http://localhost:8080/"),
 		DBHost:      getEnv("DB_HOST", "localhost"),
 		DBPort:      getEnv("DB_PORT", "3306"),
 		DBUser:      getEnv("DB_USER", "root"),

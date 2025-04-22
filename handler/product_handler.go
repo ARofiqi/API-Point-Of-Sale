@@ -8,7 +8,10 @@ import (
 	"aro-shop/utils"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -206,10 +209,43 @@ func CreateProduct(c echo.Context) error {
 		errorDetails = make(dto.ErrorDetails)
 	)
 
-	if err := c.Bind(&req); err != nil {
-		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, nil)
+	// Bind form field ke struct (bukan untuk file)
+	req.Name = c.FormValue("name")
+	req.Description = c.FormValue("description")
+	req.Price, _ = strconv.ParseFloat(c.FormValue("price"), 64)
+	req.Stock, _ = strconv.Atoi(c.FormValue("stock"))
+	req.CategoryID, _ = uuid.Parse(c.FormValue("category_id"))
+
+	// Ambil file dari form-data
+	file, err := c.FormFile("image")
+	if err != nil {
+		errorDetails["image"] = "Image file is required"
+		return utils.Response(c, http.StatusBadRequest, "Image is required", nil, err, errorDetails)
 	}
 
+	src, err := file.Open()
+	if err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Failed to open image", nil, err, nil)
+	}
+	defer src.Close()
+
+	// Simpan file di folder local
+	filename := fmt.Sprintf("public/uploads/%s-%s", uuid.New().String(), file.Filename)
+	dst, err := os.Create(filename)
+	if err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Failed to save image", nil, err, nil)
+	}
+	defer dst.Close()
+
+	if _, err = io.Copy(dst, src); err != nil {
+		return utils.Response(c, http.StatusInternalServerError, "Failed to copy image", nil, err, nil)
+	}
+
+	// Misal URL-nya dari server lokal
+	baseURL := cfg.BaseURL
+	imageURL := baseURL + "public/uploads/" + filepath.Base(filename)
+
+	// Validasi manual jika perlu
 	if err := validate.Struct(req); err != nil {
 		errorDetails := make(map[string]string)
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
@@ -220,40 +256,44 @@ func CreateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, err, errorDetails)
 	}
 
+	// Buat product
 	product = models.Product{
-		Name:       req.Name,
-		Price:      req.Price,
-		CategoryID: req.CategoryID,
+		Name:        req.Name,
+		Description: req.Description,
+		Price:       req.Price,
+		Stock:       req.Stock,
+		URLImage:    imageURL,
+		CategoryID:  req.CategoryID,
 	}
 
+	// Cek kategori
 	if err := db.DB.First(&category, product.CategoryID).Error; err != nil {
 		errorDetails["category"] = "Category not found"
 		return utils.Response(c, http.StatusBadRequest, "Invalid category ID", nil, err, errorDetails)
 	}
 
+	// Simpan ke DB
 	if err := db.DB.Create(&product).Error; err != nil {
 		errorDetails["database"] = err.Error()
 		return utils.Response(c, http.StatusInternalServerError, "Failed to create product", nil, err, errorDetails)
 	}
 
+	// Ambil data lengkap + relasi
 	if err := db.DB.Preload("Category").First(&product, product.ID).Error; err != nil {
 		errorDetails["database"] = err.Error()
 		return utils.Response(c, http.StatusInternalServerError, "Failed to load product with category", nil, err, errorDetails)
 	}
 
-	// Konversi ke format response yang diinginkan
-	var productResponses dto.ProductResponse = dto.ConvertToProductResponse(product)
-
+	response := dto.ConvertToProductResponse(product)
 	go cache.ResetRedisCache(cachedDataProducts...)
 
-	return utils.Response(c, http.StatusCreated, "Product created successfully", productResponses, nil, nil)
+	return utils.Response(c, http.StatusCreated, "Product created successfully", response, nil, nil)
 }
 
 func UpdateProduct(c echo.Context) error {
 	var (
 		errorDetails = make(dto.ErrorDetails)
 		product      models.Product
-		input        models.Product
 		id           = c.Param("id")
 	)
 
@@ -263,27 +303,86 @@ func UpdateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusBadRequest, "Invalid ID format", nil, err, errorDetails)
 	}
 
+	// Cek produk ada atau tidak
 	if err := db.DB.First(&product, "id = ?", uuidID).Error; err != nil {
 		errorDetails["id"] = "Product not found"
 		return utils.Response(c, http.StatusNotFound, "Client error", nil, err, errorDetails)
 	}
 
-	if err := c.Bind(&input); err != nil {
-		for _, err := range err.(validator.ValidationErrors) {
-			errorDetails[err.Field()] = "Field validation failed on the '" + err.Tag() + "' tag"
-		}
-		return utils.Response(c, http.StatusBadRequest, "Invalid request format", nil, err, errorDetails)
+	// Ambil dan cek form value satu per satu
+	if name := c.FormValue("name"); name != "" {
+		product.Name = name
 	}
 
-	if input.CategoryID != uuid.Nil {
-		var category models.Category
-		if err := db.DB.First(&category, input.CategoryID).Error; err != nil {
-			errorDetails["category"] = "Category not found"
-			return utils.Response(c, http.StatusBadRequest, "Invalid category ID", nil, err, errorDetails)
+	if description := c.FormValue("description"); description != "" {
+		product.Description = description
+	}
+
+	if priceStr := c.FormValue("price"); priceStr != "" {
+		price, err := strconv.ParseFloat(priceStr, 64)
+		if err != nil || price <= 0 {
+			errorDetails["price"] = "Invalid price"
+		} else {
+			product.Price = price
 		}
 	}
 
-	if err := db.DB.Model(&product).Updates(input).Error; err != nil {
+	if stockStr := c.FormValue("stock"); stockStr != "" {
+		stock, err := strconv.Atoi(stockStr)
+		if err != nil || stock < 0 {
+			errorDetails["stock"] = "Invalid stock"
+		} else {
+			product.Stock = stock
+		}
+	}
+
+	if categoryIDStr := c.FormValue("category_id"); categoryIDStr != "" {
+		categoryID, err := uuid.Parse(categoryIDStr)
+		if err != nil {
+			errorDetails["category_id"] = "Invalid category ID"
+		} else {
+			var category models.Category
+			if err := db.DB.First(&category, categoryID).Error; err != nil {
+				errorDetails["category"] = "Category not found"
+			} else {
+				product.CategoryID = categoryID
+			}
+		}
+	}
+
+	if len(errorDetails) > 0 {
+		return utils.Response(c, http.StatusBadRequest, "Validation failed", nil, nil, errorDetails)
+	}
+
+	// Upload file jika ada
+	file, err := c.FormFile("url_image")
+	if err == nil {
+		src, err := file.Open()
+		if err != nil {
+			errorDetails["file"] = "Failed to open file"
+			return utils.Response(c, http.StatusInternalServerError, "File error", nil, err, errorDetails)
+		}
+		defer src.Close()
+
+		filename := uuid.New().String() + filepath.Ext(file.Filename)
+		filepath := "uploads/" + filename
+		dst, err := os.Create(filepath)
+		if err != nil {
+			errorDetails["file"] = "Failed to save file"
+			return utils.Response(c, http.StatusInternalServerError, "File error", nil, err, errorDetails)
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, src); err != nil {
+			errorDetails["file"] = "Failed to copy file"
+			return utils.Response(c, http.StatusInternalServerError, "File error", nil, err, errorDetails)
+		}
+
+		product.URLImage = c.Scheme() + "://" + c.Request().Host + "/uploads/" + filename
+	}
+
+	// Simpan perubahan
+	if err := db.DB.Save(&product).Error; err != nil {
 		errorDetails["database"] = "Failed to update product"
 		return utils.Response(c, http.StatusInternalServerError, "Internal server error", nil, err, errorDetails)
 	}
@@ -293,8 +392,7 @@ func UpdateProduct(c echo.Context) error {
 		return utils.Response(c, http.StatusInternalServerError, "Failed to load product with category", nil, err, errorDetails)
 	}
 
-	var productResponses dto.ProductResponse = dto.ConvertToProductResponse(product)
-
+	productResponses := dto.ConvertToProductResponse(product)
 	go cache.ResetRedisCache(cachedDataProducts...)
 
 	return utils.Response(c, http.StatusOK, "Product updated successfully", productResponses, nil, nil)
